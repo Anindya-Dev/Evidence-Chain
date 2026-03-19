@@ -1,0 +1,83 @@
+[
+  {
+    "claim": "COVID vaccines cause infertility and are banned in Europe",
+    "sub_claims": [
+      "covid vaccines cause infertility",
+      "covid vaccines are banned in europe"
+    ],
+    "rag_verdict": "FALSE",
+    "rag_confidence": 0.95,
+    "bert_prob": 0.4983,
+    "final_verdict": "FAKE",
+    "confidence": 0.5437,
+    "hallucinated": false,
+    "sub_results": [
+      {
+        "sub_claim": "covid vaccines cause infertility",
+        "verdict": "FALSE",
+        "reasoning": "The claim is clearly contradicted by evidence from highly credible sources, including the WHO, which states that there is no scientific evidence that COVID-19 vaccines cause infertility."
+      },
+      {
+        "sub_claim": "covid vaccines are banned in europe",
+        "verdict": "FALSE",
+        "reasoning": "The claim is clearly contradicted by evidence from the WHO, which states that COVID-19 vaccines have been approved by the European Medicines Agency for use across EU member states, indicating they are not banned in Europe."
+      }
+    ]
+  },
+  {
+    "claim": "The unemployment rate is the lowest it has been in 50 years",
+    "sub_claims": [
+      "the unemployment rate is currently at its lowest point",
+      "the current unemployment rate is the lowest it has been in 50 years"
+    ],
+    "rag_verdict": "UNVERIFIABLE",
+    "rag_confidence": 0.0,
+    "bert_prob": 0.8163,
+    "final_verdict": "REAL",
+    "confidence": 0.5243,
+    "hallucinated": false,
+    "sub_results": [
+      {
+        "sub_claim": "the unemployment rate is currently at its lowest point",
+        "verdict": "UNVERIFIABLE",
+        "reasoning": "The evidence does not provide current unemployment rate data, only historical information, making it impossible to verify the claim about the current unemployment rate."
+      },
+      {
+        "sub_claim": "the current unemployment rate is the lowest it has been in 50 years",
+        "verdict": "UNVERIFIABLE",
+        "reasoning": "The evidence does not provide current data on the unemployment rate, only historical information, making it impossible to verify the claim about the current rate being the lowest in 50 years."
+      }
+    ]
+  },
+  {
+    "claim": "In the case of a catastrophic event the CDC offices in Atlanta will self-destruct",
+    "sub_claims": [
+      "The CDC has offices in Atlanta",
+      "The CDC offices in Atlanta are capable of self-destruction",
+      "The CDC offices in Atlanta will self-destruct in the case of a catastrophic event"
+    ],
+    "rag_verdict": "FALSE",
+    "rag_confidence": 0.7,
+    "bert_prob": 0.2669,
+    "final_verdict": "FAKE",
+    "confidence": 0.6338,
+    "hallucinated": false,
+    "sub_results": [
+      {
+        "sub_claim": "The CDC has offices in Atlanta",
+        "verdict": "TRUE",
+        "reasoning": "The claim is supported by evidence [1] from Wikipedia, which states that the CDC is headquartered in Atlanta, Georgia, implying the presence of offices there."
+      },
+      {
+        "sub_claim": "The CDC offices in Atlanta are capable of self-destruction",
+        "verdict": "FALSE",
+        "reasoning": "The claim is contradicted by evidence [1] from Wikipedia, which states that the CDC does not have self-destruct mechanisms."
+      },
+      {
+        "sub_claim": "The CDC offices in Atlanta will self-destruct in the case of a catastrophic event",
+        "verdict": "FALSE",
+        "reasoning": "The claim is contradicted by evidence [1] from Wikipedia, which states that the CDC does not have self-destruct mechanisms."
+      }
+    ]
+  }
+]
