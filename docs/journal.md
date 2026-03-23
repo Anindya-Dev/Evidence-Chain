@@ -108,3 +108,11 @@ Paper side:
   ✅ Section 4   — Experimental Setup
   ✅ Section 5.1 — BERT baseline results
   ✅ Section 5.2 — Full pipeline results
+
+data/processed/:
+  ✅ train.csv        — LIAR train
+  ✅ val.csv          — LIAR val  
+  ✅ test.csv         — LIAR test
+  ✅ isot_train.csv   — ISOT train
+  ✅ isot_val.csv     — ISOT val
+  ✅ isot_test.csv    — ISOT test

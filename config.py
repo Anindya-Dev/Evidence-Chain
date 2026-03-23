@@ -100,3 +100,8 @@ LLM_PROVIDER    = "groq"
 LLM_MODEL       = "llama-3.3-70b-versatile"
 LLM_TEMPERATURE = 0.0
 LLM_MAX_TOKENS  = 1000
+
+# ── Dataset Selection ──────────────────────────────────────────────────
+# Switch between LIAR and ISOT training
+# Used for cross-dataset evaluation in paper
+DATASET = "isot"   # options: "liar" or "isot"

@@ -39,20 +39,31 @@ class LIARDataset(Dataset):
 
 
 def load_processed_data():
-    train_df = pd.read_csv(os.path.join(config.DATA_PROCESSED, "train.csv"))
-    val_df   = pd.read_csv(os.path.join(config.DATA_PROCESSED, "val.csv"))
-    test_df  = pd.read_csv(os.path.join(config.DATA_PROCESSED, "test.csv"))
+    """
+    Loads processed data based on config.DATASET setting.
+    Switch between liar and isot in config.py — no code change needed.
+    """
+
+    if config.DATASET == "isot":
+        train_df = pd.read_csv(os.path.join(config.DATA_PROCESSED, "isot_train.csv"))
+        val_df   = pd.read_csv(os.path.join(config.DATA_PROCESSED, "isot_val.csv"))
+        test_df  = pd.read_csv(os.path.join(config.DATA_PROCESSED, "isot_test.csv"))
+        print(f"Dataset: ISOT")
+    else:
+        train_df = pd.read_csv(os.path.join(config.DATA_PROCESSED, "train.csv"))
+        val_df   = pd.read_csv(os.path.join(config.DATA_PROCESSED, "val.csv"))
+        test_df  = pd.read_csv(os.path.join(config.DATA_PROCESSED, "test.csv"))
+        print(f"Dataset: LIAR")
 
     train_df = train_df.dropna(subset=["binary_label", "combined_text"])
     val_df   = val_df.dropna(subset=["binary_label", "combined_text"])
     test_df  = test_df.dropna(subset=["binary_label", "combined_text"])
 
-    # DEV MODE — small sample for fast iteration
     if config.DEV_MODE:
         train_df = train_df.sample(config.DEV_SAMPLE_SIZE, random_state=config.RANDOM_SEED)
         val_df   = val_df.sample(100, random_state=config.RANDOM_SEED)
         test_df  = test_df.sample(100, random_state=config.RANDOM_SEED)
-        print(f"DEV MODE: using {config.DEV_SAMPLE_SIZE} train samples")
+        print(f"DEV MODE: {config.DEV_SAMPLE_SIZE} train samples")
 
     print(f"Train : {len(train_df)} rows")
     print(f"Val   : {len(val_df)} rows")
@@ -66,7 +77,6 @@ def train(model, dataloader, optimizer, device):
     model.train()
     total_loss = 0
 
-    # tqdm wraps the dataloader and shows a live progress bar
     progress = tqdm(dataloader, desc="  Training", leave=False)
 
     for batch in progress:
@@ -88,7 +98,6 @@ def train(model, dataloader, optimizer, device):
         loss.backward()
         optimizer.step()
 
-        # Show live loss in progress bar
         progress.set_postfix({"loss": f"{loss.item():.4f}"})
 
     return total_loss / len(dataloader)
@@ -164,11 +173,12 @@ if __name__ == "__main__":
 
     optimizer = AdamW(model.parameters(), lr=config.BERT_LR)
 
-    print(f"\nFine-tuning RoBERTa for {config.BERT_EPOCHS} epochs...")
+    print(f"\nFine-tuning RoBERTa on {config.DATASET.upper()} for {config.BERT_EPOCHS} epochs...")
     print("-" * 50)
 
     best_f1    = 0
     best_epoch = 0
+    model_name = f"roberta_{config.DATASET}"
 
     for epoch in range(config.BERT_EPOCHS):
         print(f"\nEpoch {epoch+1}/{config.BERT_EPOCHS}")
@@ -184,16 +194,16 @@ if __name__ == "__main__":
             best_f1    = val_f1
             best_epoch = epoch + 1
             os.makedirs(config.MODELS_DIR, exist_ok=True)
-            model.save_pretrained(os.path.join(config.MODELS_DIR, "roberta_liar"))
-            tokenizer.save_pretrained(os.path.join(config.MODELS_DIR, "roberta_liar"))
+            model.save_pretrained(os.path.join(config.MODELS_DIR, model_name))
+            tokenizer.save_pretrained(os.path.join(config.MODELS_DIR, model_name))
             print(f"  ✓ Best model saved (F1={best_f1:.4f})")
 
     print(f"\nBest model: Epoch {best_epoch} with F1 = {best_f1:.4f}")
 
-    # Final test evaluation
+    # Final test evaluation using best saved model
     print("\nLoading best model for test evaluation...")
     best_model = RobertaForSequenceClassification.from_pretrained(
-        os.path.join(config.MODELS_DIR, "roberta_liar")
+        os.path.join(config.MODELS_DIR, model_name)
     )
     best_model.to(device)
 
@@ -213,7 +223,7 @@ if __name__ == "__main__":
     )
 
     print("\n" + "="*50)
-    print("  FINAL TEST RESULTS")
+    print(f"  FINAL TEST RESULTS — {config.DATASET.upper()}")
     print("="*50)
     print(f"  Accuracy : {test_acc:.4f}")
     print(f"  F1 Score : {test_f1:.4f}")
@@ -225,6 +235,7 @@ if __name__ == "__main__":
 
     os.makedirs(config.TABLES_DIR, exist_ok=True)
     results = {
+        "dataset"   : config.DATASET,
         "model"     : config.BERT_MODEL_NAME,
         "accuracy"  : round(test_acc, 4),
         "f1_score"  : round(test_f1, 4),
@@ -232,7 +243,7 @@ if __name__ == "__main__":
         "best_epoch": best_epoch
     }
     pd.DataFrame([results]).to_csv(
-        os.path.join(config.TABLES_DIR, "bert_results.csv"),
+        os.path.join(config.TABLES_DIR, f"bert_results_{config.DATASET}.csv"),
         index=False
     )
-    print("\nResults saved to results/tables/bert_results.csv")
+    print(f"\nResults saved to results/tables/bert_results_{config.DATASET}.csv")

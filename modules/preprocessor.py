@@ -1,4 +1,5 @@
-# Cleans and prepares LIAR dataset for model input.
+# modules/preprocessor.py
+# Cleans and prepares LIAR and ISOT datasets for model input.
 # Every decision documented with reasoning.
 
 import re
@@ -17,31 +18,22 @@ def preprocess_text(text):
     patterns like 'Says' and 'says' are both caught.
     """
 
-    # Safety net — should not reach here after fillna
-    # but defensive programming prevents silent failures
     if pd.isna(text):
         return "unknown"
 
     # Step 1: Lowercase
-    # Removes artificial token differences like Vaccine vs vaccine
     text = text.lower()
 
     # Step 2: Remove URLs
-    # http/https/www patterns add noise, never repeat identically
     text = re.sub(r'http\S+|www\S+', '', text)
 
     # Step 3: Remove special characters, keep apostrophes
-    # Apostrophes preserved → "isn't" ≠ "is" for BERT context
-    # Numbers preserved → "50 percent" carries factual meaning
     text = re.sub(r"[^a-z0-9\s']", '', text)
 
-    # Step 4: Strip "says" prefix
-    # PolitiFact artifact — not part of the actual claim
-    # ^ anchors to start of string only
+    # Step 4: Strip "says" prefix — PolitiFact artifact
     text = re.sub(r'^says\s+', '', text)
 
     # Step 5: Normalize whitespace
-    # Collapses multiple spaces into one clean space
     text = re.sub(r'\s+', ' ', text).strip()
 
     return text
@@ -49,76 +41,120 @@ def preprocess_text(text):
 
 def preprocess_dataframe(df):
     """
-    Applies full preprocessing pipeline to a DataFrame.
+    Preprocesses LIAR DataFrame.
     Returns enriched DataFrame ready for model input.
     """
 
-    # Work on a copy — never mutate original data
-    # This lets us compare raw vs processed if needed
     df = df.copy()
 
-    # Step 1: Fill missing values in text columns only
-    # Why "unknown" not ""?
-    # "unknown" is an explicit signal — empty string is invisible
-    # Numeric columns (barely_true_counts etc.) left untouched
+    # Fill missing text columns with "unknown"
     text_cols = ["job_title", "state_info", "context",
                  "speaker", "subject", "party_affiliation"]
     for col in text_cols:
         df[col] = df[col].fillna("unknown").replace("", "unknown")
 
-    # Step 2: Apply text cleaning to statement column
+    # Clean statement
     df["clean_statement"] = df["statement"].apply(preprocess_text)
 
-    # Step 3: Build structured combined text field
-    # Why structured tags [CLAIM] [SPEAKER] [SUBJECT]?
-    # RoBERTa can attend to these boundaries during fine-tuning
-    # Speaker context helps — Obama's claims ≠ unknown blog's claims
+    # Build structured combined text
     df["combined_text"] = (
-        "[CLAIM] "   + df["clean_statement"] +
+        "[CLAIM] "    + df["clean_statement"] +
         " [SPEAKER] " + df["speaker"] +
         " [SUBJECT] " + df["subject"]
     )
 
-    # Step 4: Map 6-class labels to binary using config
-    # Why config.LABEL_MAP and not hardcoded?
-    # Single source of truth — change mapping in one place only
+    # Map 6-class to binary
     df["binary_label"] = df["label"].map(config.LABEL_MAP)
 
     return df
 
 
+def preprocess_isot_dataframe(df):
+    """
+    Preprocesses ISOT DataFrame.
+
+    Key difference from LIAR:
+    ISOT has full articles — we use title + first 400 words.
+    Why 400 words? RoBERTa max is 512 tokens.
+    Taking title + opening captures the most important content.
+    News articles bury key claims in the first paragraph.
+    """
+
+    df = df.copy()
+
+    # Clean title
+    df["title"] = df["title"].fillna("").apply(preprocess_text)
+
+    # Truncate text to first 400 words then clean
+    # Why 400? Leaves room for title within 512 token limit
+    df["text_truncated"] = df["text"].fillna("").apply(
+        lambda x: " ".join(str(x).split()[:400])
+    )
+    df["text_truncated"] = df["text_truncated"].apply(preprocess_text)
+
+    # Build combined text — title carries strong signal in ISOT
+    # Sensational titles vs neutral Reuters titles
+    df["combined_text"] = (
+        "[TITLE] " + df["title"] +
+        " [BODY] "  + df["text_truncated"]
+    )
+
+    return df
+
+
 if __name__ == "__main__":
-    from data_loader import load_liar
+    from data_loader import load_liar, load_isot
 
-    train_df, val_df, test_df = load_liar()
-
-    print("Preprocessing train split...")
-    train_clean = preprocess_dataframe(train_df)
-
-    # Save processed splits to data/processed/
-    # Why save? Preprocessing takes time — load clean data directly next time
     os.makedirs(config.DATA_PROCESSED, exist_ok=True)
 
-    val_clean  = preprocess_dataframe(val_df)
-    test_clean = preprocess_dataframe(test_df)
+    # ── LIAR ──────────────────────────────────────────────
+    print("Loading and preprocessing LIAR...")
+    train_df, val_df, test_df = load_liar()
+
+    train_clean = preprocess_dataframe(train_df)
+    val_clean   = preprocess_dataframe(val_df)
+    test_clean  = preprocess_dataframe(test_df)
 
     train_clean.to_csv(os.path.join(config.DATA_PROCESSED, "train.csv"), index=False)
     val_clean.to_csv(os.path.join(config.DATA_PROCESSED,   "val.csv"),   index=False)
     test_clean.to_csv(os.path.join(config.DATA_PROCESSED,  "test.csv"),  index=False)
 
-    print("\nProcessed files saved to data/processed/")
-    print(f"  Train : {len(train_clean)} rows")
-    print(f"  Val   : {len(val_clean)} rows")
-    print(f"  Test  : {len(test_clean)} rows")
+    print(f"  Train : {len(train_clean)} rows saved")
+    print(f"  Val   : {len(val_clean)} rows saved")
+    print(f"  Test  : {len(test_clean)} rows saved")
 
-
-
-    # Verify output
-    print("\nSample output:")
-    for i in range(3):
+    # Verify LIAR
+    print("\nSample LIAR output:")
+    for i in range(2):
         row = train_clean.iloc[i]
-        print(f"\nRow {i+1}:")
-        print(f"  Original  : {train_df.iloc[i]['statement']}")
-        print(f"  Cleaned   : {row['clean_statement']}")
-        print(f"  Combined  : {row['combined_text']}")
-        print(f"  Label     : {row['label']} → {row['binary_label']}")
+        print(f"\n  Row {i+1}:")
+        print(f"  Original : {train_df.iloc[i]['statement']}")
+        print(f"  Cleaned  : {row['clean_statement']}")
+        print(f"  Label    : {row['label']} → {row['binary_label']}")
+
+    # ── ISOT ──────────────────────────────────────────────
+    print("\n\nLoading and preprocessing ISOT...")
+    isot_train, isot_val, isot_test = load_isot()
+
+    isot_train_clean = preprocess_isot_dataframe(isot_train)
+    isot_val_clean   = preprocess_isot_dataframe(isot_val)
+    isot_test_clean  = preprocess_isot_dataframe(isot_test)
+
+    isot_train_clean.to_csv(os.path.join(config.DATA_PROCESSED, "isot_train.csv"), index=False)
+    isot_val_clean.to_csv(os.path.join(config.DATA_PROCESSED,   "isot_val.csv"),   index=False)
+    isot_test_clean.to_csv(os.path.join(config.DATA_PROCESSED,  "isot_test.csv"),  index=False)
+
+    print(f"  Train : {len(isot_train_clean)} rows saved")
+    print(f"  Val   : {len(isot_val_clean)} rows saved")
+    print(f"  Test  : {len(isot_test_clean)} rows saved")
+
+    # Verify ISOT
+    print("\nSample ISOT output:")
+    for i in range(2):
+        row = isot_train_clean.iloc[i]
+        print(f"\n  Row {i+1}:")
+        print(f"  Label    : {row['label']} → {row['binary_label']}")
+        print(f"  Combined : {row['combined_text'][:150]}...")
+
+    print("\nAll preprocessing complete.")
+    print(f"Files in data/processed/: {os.listdir(config.DATA_PROCESSED)}")

@@ -300,6 +300,20 @@ and websites flagged by PolitiFact as unreliable (fake news),
 with binary labels. Unlike LIAR, ISOT contains full article
 text, testing the system's ability to handle longer inputs
 and stylistic manipulation patterns.
+Exploratory analysis of ISOT reveals properties that 
+contrast sharply with LIAR. The dataset contains 44,898 
+full news articles with a near-balanced binary label 
+distribution (52.5% FAKE, 47.5% REAL). Article length 
+ranges from 0 to 8,135 words with a mean of 405.7 words 
+— approximately 23 times longer than LIAR claims. This 
+length difference has direct implications for the 
+RoBERTa classifier, which must truncate articles to its 
+512-token limit, retaining only the opening portion of 
+each article. Notably, ISOT fake news exhibits strong 
+stylistic signals — sensational headlines, emotional 
+language, and partisan framing — making it a more 
+tractable classification task than LIAR's subtle 
+political half-truths.
 
 The complementary nature of these datasets is deliberate.
 LIAR tests claim-level reasoning on subtle, politically

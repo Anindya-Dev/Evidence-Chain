@@ -1,5 +1,16 @@
+# Environment
 .env
+.venv/
 venv/
 __pycache__/
 *.pyc
+
+# Large model files
 results/models/
+
+# Large data files
+data/raw/
+data/processed/
+
+# Kaggle/HuggingFace cache
+*.zip
