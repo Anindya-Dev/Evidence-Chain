@@ -1,118 +1,108 @@
----
-## ✅ CheckPoint-1
-```
-Code side:
-  ✅ Full folder structure
-  ✅ requirements.txt — all dependencies
-  ✅ config.py — all settings with documented reasoning
+# EvidenceChain Journal
 
-Paper side:
-  ✅ Title
-  ✅ Introduction — complete, professional, cites 3 contributions
-  ✅ Dataset section — complete with citations
-  ✅ Baseline comparison section — ready for results
-  ✅ Evaluation metrics section — complete
-  ✅ References started
+## 2026-03-23 - Documentation and Reporting Pass
 
-## ✅ CheckPoint-2
-```
-Code side:
-  ✅ venv created and activated
-  ✅ requirements.txt — all dependencies installed
-  ✅ config.py — all settings with documented reasoning
+### What was completed in this pass
 
-Paper side:
-  ✅ Section 3.2 — Experimental Configuration complete
+- Rewrote `docs/paper.md` so it reflects the real project state instead
+  of placeholders and optimistic future claims.
+- Added `docs/research_tracker.md` to track what is being used, why it
+  is being used, and what is still pending.
+- Rewrote `docs/simple_notes.md` into a cleaner plain-English version of
+  the project.
+- Fixed the ablation path so "no weighting" now removes weighting during
+  retrieval instead of only after ranking.
+- Tightened evaluation reporting so evidence recall depends on retrieval
+  similarity instead of counting every claim as relevant.
+- Expanded pipeline outputs so sub-claim level analysis can be tracked
+  more honestly in future evaluation runs.
 
-## ✅ CheckPoint-3
+### Current reproducible state
 
-  ✅ venv active
-  ✅ All dependencies installed
-  ✅ config.py built with documented reasoning
-  ✅ .env storing API key securely
-  ✅ .gitignore protecting secrets
-  ✅ Groq LLM verified and responding
+- LIAR preprocessing: complete
+- ISOT preprocessing: complete
+- LIAR RoBERTa baseline: complete
+- FAISS knowledge base: complete as a prototype
+- Claim decomposition: complete
+- LLM reasoning: complete
+- Hallucination flagging: complete
+- Full LIAR pipeline: complete
+- ISOT RoBERTa training: running externally, not touched here
 
-✅ Preprocessor Complete
-Code side:
-  ✅ data_loader.py   — loads LIAR from TSV
-  ✅ preprocessor.py  — cleans and enriches data
+### Current saved metrics
 
-Paper side:
-  ✅ Section 3.3      — Data Preprocessing complete
+- LIAR RoBERTa baseline:
+  - Accuracy: 0.6461
+  - Weighted F1: 0.6443
+  - Best epoch: 2
 
+- Saved LIAR full-pipeline sample (50 claims):
+  - Accuracy: 0.5000
+  - Weighted F1: 0.4833
+  - ROC-AUC: 0.6208
+  - Hallucination rate: 0.46
 
-## ✅ Checkpoint
-```
-Code side:
-  ✅ data_loader.py
-  ✅ preprocessor.py
-  ✅ bert_classifier.py  — trained, saved, evaluated
+- Saved LIAR ablation sample (30 claims):
+  - Full EvidenceChain: 0.5333 accuracy, 0.5354 weighted F1
+  - BERT-only: 0.6333 accuracy, 0.6243 weighted F1
+  - RAG-only: 0.4333 accuracy, 0.2620 weighted F1
 
-Results side:
-  ✅ results/tables/bert_results.csv
-  ✅ results/models/roberta_liar/
+### What these results mean
 
-Paper side:
-  ✅ Section 5.1 — RoBERTa baseline results complete
+The codebase is no longer just a folder of disconnected modules. It is a
+working research prototype with a saved LIAR baseline, a saved knowledge
+base, a full pipeline, and reporting artifacts.
 
+At the same time, the current retrieval-plus-reasoning branch is not yet
+strong enough to beat the RoBERTa-only baseline. That is the main
+research bottleneck right now.
 
-  ## ✅ Checkpoint
-```
-Code side:
-  ✅ data_loader.py
-  ✅ preprocessor.py
-  ✅ bert_classifier.py
-  ✅ retriever.py
-  ✅ decomposer.py
-  ✅ reasoner.py
+### Important current limitations
 
-Paper side:
-  ✅ Section 3.3 — Data Preprocessing
-  ✅ Section 3.4 — Claim Decomposition
-  ✅ Section 3.5 — LLM Reasoning + Hallucination Detection
+1. The current knowledge base is small and document-level.
+2. The ensemble still needs training on real validation-set features.
+3. ISOT training is not finished yet, so cross-dataset claims must wait.
+4. Evaluation and ablation should be rerun after the latest reporting
+   fixes.
 
+### Next actions
 
-## ✅ Full Checkpoint
-```
-Code side:
-  ✅ data_loader.py
-  ✅ preprocessor.py
-  ✅ bert_classifier.py
-  ✅ retriever.py
-  ✅ decomposer.py
-  ✅ reasoner.py
-  ✅ ensemble.py
+1. Wait for the ISOT model to finish training.
+2. Save the ISOT checkpoint and add ISOT baseline results.
+3. Train the ensemble on real validation-set features.
+4. Rerun full evaluation on LIAR with the corrected reporting code.
+5. Rerun ablation after ensemble retraining.
+6. Add SHAP analysis and human evaluation.
 
-Paper side:
-  ✅ Section 3.3 — Data Preprocessing
-  ✅ Section 3.4 — Claim Decomposition
-  ✅ Section 3.5 — LLM Reasoning + Hallucination Detection
-  ✅ Section 3.6 — Stacking Ensemble
-  
-  ## ✅ Full System Checkpoint
-```
-Code side — ALL MODULES COMPLETE:
-  ✅ data_loader.py
-  ✅ preprocessor.py
-  ✅ bert_classifier.py
-  ✅ retriever.py
-  ✅ decomposer.py
-  ✅ reasoner.py
-  ✅ ensemble.py
-  ✅ pipeline.py  ← everything connected
+## Milestone Summary So Far
 
-Paper side:
-  ✅ Section 1   — Introduction
-  ✅ Section 3   — Full Methodology
-  ✅ Section 4   — Experimental Setup
-  ✅ Section 5.1 — BERT baseline results
-  ✅ Section 5.2 — Full pipeline results
+### Infrastructure
 
-data/processed/:
-  ✅ train.csv        — LIAR train
-  ✅ val.csv          — LIAR val  
-  ✅ test.csv         — LIAR test
-  ✅ isot_train.csv   — ISOT train
-  ✅ isot_val.csv     — ISOT val
-  ✅ isot_test.csv    — ISOT test
+- Project structure created
+- Virtual environment and dependencies prepared
+- Central configuration created
+- API key handling set up through `.env`
+
+### Data
+
+- LIAR raw data loaded and processed
+- ISOT raw data loaded and processed
+
+### Models
+
+- LIAR RoBERTa model trained and saved
+- ISOT RoBERTa training in progress
+- Decomposition and reasoning modules connected
+
+### Retrieval
+
+- Knowledge base built and saved
+- FAISS retrieval working
+- Source and temporal weighting implemented
+
+### Writing
+
+- Paper draft upgraded from placeholder-heavy to a real working draft
+- Journal cleaned and converted into a usable status log
+- Simple notes aligned with the real project state
+- Research tracker added for tool and design decisions

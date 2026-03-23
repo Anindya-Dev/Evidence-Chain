@@ -1,16 +1,26 @@
-BEFORE any claim arrives:
-  1. Load trusted documents (Wikipedia, news articles)
-  2. Split into chunks (300 words each)
-  3. Convert chunks to embeddings (sentence-transformers)
-  4. Store embeddings in FAISS index
-  → This is the knowledge base — built ONCE, used forever
+## EvidenceChain RAG Pipeline
 
-WHEN a claim arrives:
-  1. Convert claim to embedding
-  2. Search FAISS for top-5 similar chunks
-  3. Apply source credibility weight to each chunk
-  4. Apply temporal weight (prefer recent)
-  5. Feed claim + evidence to LLM
-  6. LLM returns verdict + reasoning
-  7. Check for hallucination
-  8. Return structured result
+### Offline step: build the knowledge base
+
+1. Collect trusted evidence documents.
+2. Encode each document with the sentence embedding model.
+3. Store embeddings in a FAISS index.
+4. Save metadata such as source, date, source weight, and recency weight.
+
+Current implementation note:
+
+- The saved repository index is document-level.
+- Chunk size and overlap are already defined in config but are not yet
+  used in the saved knowledge base.
+
+### Online step: verify a claim
+
+1. Preprocess the claim.
+2. Decompose the claim into sub-claims.
+3. Convert each sub-claim into an embedding.
+4. Search FAISS for the top-k most similar evidence items.
+5. Rank evidence with similarity plus source and recency weighting.
+6. Send the sub-claim and evidence to the LLM.
+7. Receive verdict, confidence, and explanation.
+8. Check for hallucination using similarity and confidence.
+9. Aggregate sub-claim verdicts into a final RAG verdict.

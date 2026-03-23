@@ -39,14 +39,16 @@ class Retriever:
         print(f"  Metadata      : {len(self.metadata)} documents")
 
 
-    def retrieve(self, claim, top_k=None):
+    def retrieve(self, claim, top_k=None, use_weighting=True):
         """
         Retrieves top-k evidence chunks for a claim.
         Applies combined score = similarity x source_weight + recency_weight
+        unless weighting is explicitly disabled for ablation.
 
         Args:
             claim  : string — the claim to retrieve evidence for
-            top_k  : int — number of results (default from config)
+            top_k         : int  — number of results (default from config)
+            use_weighting : bool — whether to apply source/recency weighting
 
         Returns:
             List of dicts with text, source, scores, combined_score
@@ -82,8 +84,13 @@ class Retriever:
             # Why multiply similarity by source_weight?
             # A highly similar but unreliable source should score lower
             # than a slightly less similar but authoritative source
-            combined_score = (float(score) * meta["source_weight"]
-                             + meta["recency_weight"])
+            if use_weighting:
+                combined_score = (
+                    float(score) * meta["source_weight"] +
+                    meta["recency_weight"]
+                )
+            else:
+                combined_score = float(score)
 
             results.append({
                 "text"           : meta["text"],

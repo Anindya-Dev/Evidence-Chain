@@ -1,445 +1,454 @@
-# EvidenceChain: A Decomposition-Driven Retrieval-Augmented 
-# Generation Framework for Explainable Fake News Detection 
-# with Temporal and Credibility-Aware Evidence Scoring
-
----
+# EvidenceChain: A Decomposition-Driven Retrieval-Augmented Framework for Explainable Fake News Detection
 
 ## Abstract
-*(to be completed on Day 21)*
 
----
+Fake news detection systems often rely on text-only classification,
+which makes them fast but difficult to justify. They may classify a
+claim as true or false without showing which evidence was used, they
+usually treat compound claims as single units, and they rarely measure
+whether a generated explanation is actually grounded in retrieved
+evidence. This project proposes EvidenceChain, a modular fact-checking
+pipeline that combines claim decomposition, weighted evidence retrieval,
+LLM-based evidence reasoning, a RoBERTa classifier, and a stacking
+ensemble meta-classifier. The system introduces three main ideas:
+(1) decomposition of compound claims into independently verifiable
+sub-claims, (2) source-credibility and temporal weighting during
+retrieval, and (3) an explicit hallucination flag based on the
+relationship between retrieval similarity and LLM confidence. The
+current repository contains a completed LIAR-based pipeline, processed
+LIAR and ISOT datasets, a saved LIAR RoBERTa checkpoint, a saved
+knowledge base, and evaluation and ablation scripts. On LIAR, the
+RoBERTa baseline currently achieves 0.6461 accuracy and 0.6443 weighted
+F1. The current end-to-end LIAR pipeline, evaluated on a saved sample of
+50 claims, achieves 0.5000 accuracy, 0.4833 weighted F1, 0.6208
+ROC-AUC, and a hallucination rate of 0.46. These results show that the
+retrieval and reasoning stack is implemented, but the current combined
+system still requires calibration before it can reliably outperform the
+text-only baseline. ISOT model training is in progress and will be added
+in the next revision.
 
 ## 1. Introduction
 
-The rapid proliferation of misinformation across digital platforms
-poses a significant threat to public discourse, democratic processes,
-and health outcomes. Despite growing research in automated fake news
-detection, existing systems suffer from three fundamental limitations.
+The spread of misinformation across news websites, social media, and
+political communication has made automatic fake news detection an
+important research problem. A useful fake news system must do more than
+output a label. It should explain why a claim is judged to be true or
+false, identify the evidence used in that decision, and expose cases
+where the model is uncertain or unsupported.
 
-First, compound claims — statements containing multiple independently
-verifiable assertions — are treated as single atomic units. This leads
-to systematic false negatives when one sub-claim is true and another
-is false, as the system cannot isolate the deceptive component.
+Most existing fake news classifiers operate directly on text and learn
+stylistic patterns that correlate with misinformation. These methods can
+be strong baselines, especially on article-level datasets such as ISOT,
+but they have two practical weaknesses. First, they do not explicitly
+reason over external evidence. Second, they struggle to explain how a
+decision was made. A claim may be labeled false because of linguistic
+patterns, even when the model has not actually verified the claim.
 
-Second, retrieval-based systems assign equal credibility to all
-retrieved evidence regardless of source reliability or temporal
-relevance. This is particularly problematic for evolving topics
-such as policy decisions or medical research, where outdated
-evidence may directly contradict current facts.
+Retrieval-based verification methods improve interpretability by
+bringing external evidence into the decision loop. However, they also
+have important limitations in practice. Compound claims are often passed
+to retrieval as single units, even when different parts of the claim
+require different evidence. Retrieved documents are commonly ranked only
+by semantic similarity, which ignores both source credibility and
+recency. In addition, LLM-based reasoning layers can produce confident
+answers that sound grounded while actually relying on parametric memory
+instead of the retrieved context.
 
-Third, large language model (LLM) outputs in verification pipelines
-are rarely evaluated for groundedness — the degree to which a verdict
-is actually supported by retrieved evidence rather than the model's
-parametric memory. This leaves hallucination as an unmeasured
-and uncontrolled source of error.
+EvidenceChain is designed to address these gaps through a modular
+research pipeline. The system first preprocesses and normalizes the
+claim, then decomposes it into atomic sub-claims, retrieves evidence
+from a FAISS index, reasons over that evidence with an LLM, scores
+possible hallucination, adds a RoBERTa-based text signal, and finally
+combines the symbolic and neural signals in a stacking ensemble.
 
-To address these limitations, we propose EvidenceChain, a
-retrieval-augmented generation framework for fake news detection
-that introduces three novel contributions:
+The main contributions of this project are:
 
-C1 — Atomic claim decomposition prior to evidence retrieval,
-     enabling independent verification of each sub-claim.
+1. A decomposition-first verification pipeline for compound claims.
+2. A retrieval stage that incorporates source credibility and temporal
+   relevance in addition to semantic similarity.
+3. A simple, explicit hallucination criterion for identifying LLM
+   verdicts that appear overly confident relative to the retrieved
+   evidence.
 
-C2 — Temporally-weighted, source-credibility-aware evidence
-     scoring that prioritizes recent, high-reliability documents.
-
-C3 — A formal Hallucination Rate (HR) metric that measures the
-     proportion of LLM verdicts unsupported by retrieved evidence,
-     providing a reproducible benchmark for future work.
-
-EvidenceChain combines these contributions with a fine-tuned
-RoBERTa classifier and a stacking ensemble meta-classifier,
-evaluated on the LIAR and ISOT benchmark datasets.
-
-The remainder of this paper is organized as follows.
-Section 2 reviews related work. Section 3 describes our
-methodology. Section 4 presents experimental setup.
-Section 5 reports results. Section 6 presents ablation study.
-Section 7 describes human evaluation. Section 8 concludes.
-
----
+This paper documents the current project state. The LIAR pipeline is
+implemented and evaluated. ISOT preprocessing is complete and ISOT model
+training is currently running outside this workspace. The paper is
+therefore written as a living draft: the LIAR methodology and results
+are concrete, while the ISOT and cross-dataset experiments are marked as
+the next update.
 
 ## 2. Related Work
-*(to be completed on Day 2)*
 
----
+Research on fake news detection has largely followed two directions:
+text-only classification and evidence-based verification.
+
+Text-only classification approaches learn patterns from the claim text or
+article text itself. The LIAR benchmark popularized this setting by
+providing short political claims with metadata such as speaker,
+affiliation, and context. Transformer models such as BERT and RoBERTa
+have since become standard baselines because they capture contextual
+semantics more effectively than earlier bag-of-words or recurrent
+architectures. These models are especially strong when the task is
+driven by writing style, framing, or speaker cues.
+
+Evidence-based verification systems instead retrieve external documents
+and reason over them. FEVER-style pipelines and later retrieval-augmented
+architectures showed that evidence improves interpretability and makes it
+possible to justify a verdict rather than only predict it. In recent
+RAG-based systems, dense retrievers and LLMs are often combined to
+select relevant evidence and then generate a verdict or explanation from
+that evidence.
+
+Despite these advances, three gaps remain relevant to this project.
+First, many verification pipelines still assume that an input claim is
+already atomic. This assumption breaks when a statement contains several
+independently verifiable parts. Second, retrieval systems often rank
+documents only by semantic similarity, without explicitly rewarding more
+credible sources or more recent information. Third, hallucination in the
+reasoning layer is usually discussed qualitatively rather than measured
+through a transparent and reproducible rule.
+
+EvidenceChain fits at the intersection of these areas. It retains a
+strong text-only baseline through RoBERTa, adds explicit retrieval and
+reasoning, and introduces decomposition and hallucination tracking as
+first-class components.
 
 ## 3. Methodology
-*(built progressively from Day 2 onwards)*
 
 ### 3.1 System Overview
 
-EvidenceChain processes an input claim through seven sequential
-modules: (1) preprocessing, (2) claim decomposition, (3) weighted
-evidence retrieval, (4) LLM reasoning with hallucination detection,
-(5) BERT-based linguistic classification, (6) stacking ensemble,
-and (7) explainability generation. Figure 1 illustrates the
-complete pipeline architecture.
+EvidenceChain is a modular pipeline with the following stages:
 
-### 3.2 Experimental Configuration
+1. Text preprocessing and normalization.
+2. Claim decomposition into atomic sub-claims.
+3. Evidence retrieval from a FAISS knowledge base.
+4. LLM reasoning over retrieved evidence.
+5. Hallucination detection based on similarity and confidence.
+6. RoBERTa classification of the original claim text.
+7. Stacking ensemble combination of neural and retrieval signals.
 
-All experiments use a fixed random seed of 42 to ensure full
-reproducibility across dataset splits, model initialization,
-and sampling operations.
+The main implementation entry point is `pipeline.py`, which loads the
+decomposer, retriever, reasoner, and ensemble once and then evaluates
+claims one at a time.
 
-**Model Selection:** The RoBERTa-base model [Liu et al., 2019]
-was selected over BERT-base-uncased due to its superior
-performance on text classification benchmarks. RoBERTa removes
-the Next Sentence Prediction objective and trains on
-significantly more data with larger batch sizes, consistently
-yielding 2–4% accuracy improvements on classification tasks.
+### 3.2 Data Preprocessing
 
-**Embedding Model:** Sentence embeddings are generated using
-all-MiniLM-L6-v2, a 6-layer transformer producing 384-dimensional
-vectors optimized specifically for semantic similarity tasks.
-This model offers strong performance with fast inference,
-making it suitable for large-scale evidence retrieval.
+The preprocessing module supports both LIAR and ISOT. For LIAR, the
+system lowercases text, removes URLs, strips non-alphanumeric symbols
+except apostrophes, removes the leading "says" artifact when present,
+and normalizes whitespace. Missing metadata fields such as `job_title`,
+`state_info`, and `context` are filled with the token `unknown`. The
+claim is then combined with selected metadata into a structured input:
 
-**Evidence Retrieval:** The top-5 most semantically similar
-evidence chunks are retrieved per sub-claim (k=5), determined
-empirically via validation set experiments. Document chunks
-of 300 words with 50-word overlap are used to preserve
-contextual continuity across chunk boundaries.
+`[CLAIM] <claim> [SPEAKER] <speaker> [SUBJECT] <subject>`
 
-**Hallucination Detection:** Two thresholds govern hallucination
-flagging: a minimum evidence similarity of τ_sim = 0.45 and
-a maximum LLM confidence of τ_conf = 0.75. A verdict is
-flagged as potentially hallucinated when evidence similarity
-falls below τ_sim while LLM confidence exceeds τ_conf.
-Both thresholds were selected via grid search on the
-validation set and held fixed for all test evaluations.
+This design preserves contextual information that may help the RoBERTa
+classifier distinguish subtle political claims.
 
-### 3.3 Data Preprocessing
+For ISOT, the system uses title plus truncated body text. The title is
+retained because fake and real news often differ strongly in headline
+style. The article body is limited to the first 400 words so it fits
+within RoBERTa's token budget.
 
-Raw claims from the LIAR dataset undergo a standardized 
-preprocessing pipeline before being passed to any model component.
+### 3.3 Claim Decomposition
 
-Text normalization includes lowercasing, URL removal, and 
-elimination of non-alphanumeric characters with the exception 
-of apostrophes, which are retained to preserve negation semantics 
-(e.g., "is not" vs "isn't"). Numeric values are preserved as 
-they carry factual significance in political claims. Claims 
-beginning with the prefix "Says" — an artifact of PolitiFact's 
-writing style — are stripped to isolate the core assertion.
+EvidenceChain treats claim decomposition as a core step rather than a
+post-processing trick. Many real-world statements contain multiple
+assertions. For example, the sentence "COVID vaccines cause infertility
+and are banned in Europe" contains at least two independent factual
+sub-claims. Verifying such a sentence as a single unit can mix evidence
+from separate topics and reduce reliability.
 
-Missing metadata fields (job_title: 28%, state_info: 21%, 
-context: 1%) are imputed with the placeholder value "unknown" 
-rather than empty strings, providing an explicit signal of 
-metadata unavailability. Stopwords are intentionally retained, 
-as RoBERTa processes full contextual sequences where negation 
-words such as "not" carry critical semantic weight.
+The decomposition module uses an LLM prompt that asks for a JSON array
+of atomic, independently verifiable sub-claims. The prompt explicitly
+forbids adding new information and falls back to the original claim if
+JSON parsing fails. Temperature is fixed at zero for deterministic
+behavior.
 
-Each preprocessed instance combines the claim text with speaker 
-identity and subject metadata into a structured input string:
-[CLAIM] {text} [SPEAKER] {speaker} [SUBJECT] {subject}
+### 3.4 Evidence Base and Retrieval
 
-This enriched representation allows RoBERTa to attend to 
-speaker context alongside claim content, leveraging the 
-metadata-aware architecture proposed in the original LIAR 
-paper [Wang, 2017].
+The retrieval layer is implemented with Sentence-Transformers and FAISS.
+Documents are embedded using `all-MiniLM-L6-v2`, normalized, and stored
+in an `IndexFlatIP` index so cosine similarity search can be performed
+efficiently.
 
-### 3.3 Claim Decomposition Module
+The current saved knowledge base contains 50 documents drawn from
+trusted hard-coded summaries plus Wikipedia pages. Source distribution in
+the saved metadata is:
 
-Compound claims — statements containing multiple independently
-verifiable assertions — present a fundamental challenge for
-retrieval-based fact verification. When treated as a single
-unit, mixed evidence from distinct sub-claims produces
-unreliable aggregate verdicts.
+- WHO: 2
+- Reuters: 16
+- Wikipedia: 32
 
-EvidenceChain addresses this through an LLM-based claim
-decomposition module that breaks each input claim into
-atomic, independently verifiable sub-claims prior to
-retrieval. The module prompts the LLM with explicit
-constraints: each sub-claim must be a single verifiable
-fact, no information may be added beyond what is present
-in the original claim, and output must be structured as
-a JSON array for reliable parsing.
+Each document also stores a source credibility weight and a recency
+weight. During standard retrieval, the ranking score is:
 
-Rule-based decomposition approaches — such as splitting
-on conjunctions like "and" or "but" — fail on implicit
-compound claims. For example, the claim "the CDC offices
-will self-destruct in an emergency" contains no explicit
-conjunction yet encodes two verifiable assertions: that
-CDC offices exist in Atlanta (true), and that they are
-designed to self-destruct (false). Our LLM-based approach
-correctly identifies both. Temperature is fixed at 0.0
-to ensure deterministic, reproducible decomposition.
+`ranking_score = similarity * source_weight + recency_weight`
 
-This module constitutes Novel Contribution C1 of
-EvidenceChain. Decomposition quality is evaluated
-separately through manual annotation of 100 sampled
-claims, reported in Section 7.
-```
+This design aims to reduce the effect of high-similarity but weak or
+stale evidence. A no-weighting mode is also available for ablation.
 
-### 3.5 Evidence Retrieval Module
-
-EvidenceChain employs a FAISS-based retrieval module to 
-identify semantically relevant evidence for each sub-claim. 
-Documents are encoded using the all-MiniLM-L6-v2 
-sentence transformer, producing 384-dimensional embeddings 
-that capture semantic meaning beyond keyword overlap.
-
-The retrieval index uses IndexFlatIP with L2-normalized 
-embeddings, enabling exact cosine similarity search. For 
-each sub-claim, the top-k=5 most similar document chunks 
-are retrieved and scored using our novel weighted formula:
-
-weighted_score = similarity × source_weight + recency_weight
-
-where source_weight reflects the credibility tier of the 
-source (WHO=0.95, Reuters=0.90, Wikipedia=0.70, unknown=0.30) 
-and recency_weight applies a linear decay bonus favouring 
-documents published within a two-year window. This weighted 
-scoring constitutes our second novel contribution (C2), 
-ensuring that high-similarity evidence from unreliable or 
-outdated sources does not dominate the verdict.
-```
+One important implementation note is that the current saved index is
+document-level rather than chunk-level. Chunk size and overlap are
+already defined in configuration, but the present knowledge base stores
+one embedding per document. This is a known limitation and an obvious
+next improvement.
 
 ### 3.5 LLM Reasoning and Hallucination Detection
 
-For each sub-claim, EvidenceChain constructs a structured 
-prompt containing the sub-claim and its top-k retrieved 
-evidence chunks, annotated with source credibility scores. 
-The LLM is instructed to reason exclusively over provided 
-evidence, explicitly prohibited from drawing on parametric 
-memory. Output is constrained to a structured JSON object 
-containing a verdict (TRUE, FALSE, or UNVERIFIABLE), a 
-confidence score, and a one-sentence reasoning chain.
+For each sub-claim, the reasoner builds a structured prompt containing
+the sub-claim and the retrieved evidence. The LLM is instructed to use
+only the given evidence and to return a JSON object with a verdict,
+confidence score, and one-sentence explanation.
 
-Temperature is fixed at 0.0 to ensure deterministic, 
-reproducible verdicts across identical inputs.
+The reasoner supports three verdicts:
 
-**Hallucination Detection:** A verdict is flagged as 
-potentially hallucinated when LLM confidence exceeds 
-τ_conf = 0.75 while maximum retrieved evidence similarity 
-falls below τ_sim = 0.45. This condition identifies cases 
-where the LLM expresses high certainty despite weak 
-evidentiary support — indicating reliance on parametric 
-memory rather than retrieved evidence. The Hallucination 
-Rate (HR) is formally defined as:
+- `TRUE`
+- `FALSE`
+- `UNVERIFIABLE`
 
-HR = |{claims: sim < τ_sim AND conf > τ_conf}| / |total claims|
+The module then applies a hallucination rule:
 
-This metric constitutes Novel Contribution C3 of 
-EvidenceChain, providing a reproducible m
+`hallucinated = (max_similarity < 0.45) and (confidence > 0.75)`
 
----
+This rule is intentionally simple. It does not claim to solve the full
+groundedness problem, but it gives the system an explicit diagnostic for
+cases where the LLM sounds more certain than the retrieved evidence
+justifies.
 
-### 3.6 Stacking Ensemble Meta-Classifier
+### 3.6 RoBERTa Baseline
 
-EvidenceChain combines the outputs of the RoBERTa classifier 
-and RAG reasoning pipeline through a stacking ensemble 
-meta-classifier. Rather than averaging scores with fixed 
-weights — which assumes equal reliability across all claim 
-types — the meta-classifier learns optimal feature 
-combinations from validation data.
+The text-only baseline is a fine-tuned `roberta-base` binary classifier.
+For LIAR, the original six labels are mapped to two classes:
 
-The meta-classifier receives six input features: (1) RoBERTa 
-REAL class probability, (2) RAG verdict confidence, (3) 
-maximum evidence similarity score, (4) average source 
-credibility weight, (5) hallucination flag, and (6) 
-sub-claim count. Features are standardized using 
-StandardScaler prior to classification to prevent 
-magnitude-based dominance.
+- REAL: `true`, `mostly-true`, `half-true`
+- FAKE: `barely-true`, `false`, `pants-fire`
 
-Logistic Regression was selected as the meta-classifier 
-for two reasons. First, its linear decision boundary is 
-appropriate for a small six-dimensional feature space. 
-Second, its coefficients are directly interpretable — 
-each coefficient quantifies the contribution of its 
-corresponding feature to the final verdict, providing 
-a natural complement to the SHAP analysis in Section 3.7.
+The model is trained for three epochs with batch size 16 and learning
+rate `2e-5`. The best checkpoint is selected by validation F1. This
+baseline is important because it measures how far the project can get
+using claim text alone, without retrieval or reasoning.
 
-The ensemble is trained on the validation set rather than 
-the training set to prevent data leakage — both RoBERTa 
-and the RAG pipeline were optimized on training data, 
-making validation set features a clean, uncontaminated 
-signal for meta-learning.
-```
+### 3.7 Stacking Ensemble
 
----
+The final prediction layer is a logistic regression meta-classifier that
+combines six features:
+
+1. RoBERTa probability of the REAL class.
+2. RAG verdict confidence.
+3. Maximum retrieved evidence similarity.
+4. Average source credibility weight.
+5. Hallucination flag.
+6. Number of sub-claims.
+
+The intended design is to train the ensemble on validation-set features
+to avoid leakage. The repository already contains the ensemble class and
+a saved ensemble artifact, but real validation-set calibration remains an
+important project task before final claims about full-system superiority
+should be made.
+
 ## 4. Experimental Setup
 
 ### 4.1 Datasets
 
-We evaluate EvidenceChain on two complementary benchmark datasets
-selected to test the system across varying claim lengths, domains,
-and label granularities.
+This project uses two benchmark datasets.
 
-**Dataset Analysis:** Exploratory analysis of the LIAR training 
-split reveals several properties relevant to system design. 
-The dataset contains 10,269 training instances with a near-balanced 
-binary label distribution (56.2% REAL, 43.8% FAKE), making 
-accuracy a viable but insufficient metric — we therefore adopt 
-F1-score as our primary evaluation measure. 
+**LIAR** is a benchmark of short political claims with speaker metadata.
+It is well suited to claim-level reasoning and decomposition because the
+claims are concise and often rhetorically dense.
 
-Statement lengths range from 2 to 66 words with a mean of 17.9 
-words, confirming that LIAR consists of short, dense claims 
-well-suited to our decomposition module. Notably, 28% of 
-instances contain missing job_title metadata and 21% missing 
-state_info, which are imputed with a placeholder value during 
-preprocessing. The dataset is dominated by political figures, 
-with Barack Obama (493 claims), Donald Trump (274), and 
-Hillary Clinton (239) comprising the most frequent speakers, 
-reflecting its PolitiFact origin.
+**ISOT Fake News Dataset** contains full news articles labeled as real or
+fake. It is useful for testing article-level language modeling and
+generalization to longer inputs.
 
-**LIAR** [Wang, 2017]: A dataset of 12,800 short political claims
-sourced from PolitiFact.com, annotated by human fact-checkers
-across six veracity levels: true, mostly-true, half-true,
-barely-true, false, and pants-on-fire. Following prior work,
-we map these to binary labels: true, mostly-true, and half-true
-are mapped to REAL (1); barely-true, false, and pants-on-fire
-are mapped to FAKE (0). Crucially, LIAR provides rich speaker
-metadata including historical veracity counts, party affiliation,
-and statement context, which EvidenceChain incorporates as
-additional features in the stacking ensemble.
+At the time of this draft:
 
-**ISOT Fake News Dataset** [Ahmed et al., 2020]: A dataset of
-44,000 full news articles collected from Reuters (real news)
-and websites flagged by PolitiFact as unreliable (fake news),
-with binary labels. Unlike LIAR, ISOT contains full article
-text, testing the system's ability to handle longer inputs
-and stylistic manipulation patterns.
-Exploratory analysis of ISOT reveals properties that 
-contrast sharply with LIAR. The dataset contains 44,898 
-full news articles with a near-balanced binary label 
-distribution (52.5% FAKE, 47.5% REAL). Article length 
-ranges from 0 to 8,135 words with a mean of 405.7 words 
-— approximately 23 times longer than LIAR claims. This 
-length difference has direct implications for the 
-RoBERTa classifier, which must truncate articles to its 
-512-token limit, retaining only the opening portion of 
-each article. Notably, ISOT fake news exhibits strong 
-stylistic signals — sensational headlines, emotional 
-language, and partisan framing — making it a more 
-tractable classification task than LIAR's subtle 
-political half-truths.
+- LIAR preprocessing, training, and baseline evaluation are complete.
+- ISOT preprocessing is complete.
+- ISOT RoBERTa training is in progress outside this workspace.
 
-The complementary nature of these datasets is deliberate.
-LIAR tests claim-level reasoning on subtle, politically
-nuanced statements — the primary target of our decomposition
-module. ISOT tests article-level linguistic pattern detection —
-the primary target of our RoBERTa classifier. Cross-dataset
-evaluation (train on LIAR, test on ISOT and vice versa)
-assesses generalization across domains and text lengths.
+### 4.2 Configuration
 
-### 4.2 Data Splits
+The main experimental settings in the repository are:
 
-All datasets are divided using stratified splits to preserve
-class distribution: 80% training, 10% validation, 10% test.
-Cross-dataset evaluation — training on LIAR and testing on
-ISOT, and vice versa — is conducted to assess generalization
-across domains.
+- Random seed: 42
+- RoBERTa model: `roberta-base`
+- Embedding model: `sentence-transformers/all-MiniLM-L6-v2`
+- Retrieval depth: top 5
+- Hallucination thresholds: similarity 0.45, confidence 0.75
+- LLM provider: Groq
+- LLM model: `llama-3.3-70b-versatile`
 
-### 4.3 Baselines
+### 4.3 Implemented Comparisons
 
-We compare EvidenceChain against the following systems:
-(1) TF-IDF + Logistic Regression, a classical baseline;
-(2) BERT-only fine-tuned classifier;
-(3) RAG-only pipeline without the BERT layer;
-(4) SAFE [Zhou et al., 2020], a social-context-aware model;
-(5) DFFN [state-of-the-art reference to be added].
+The repository currently supports the following implemented comparisons:
+
+- RoBERTa-only baseline
+- RAG-only pipeline
+- Full EvidenceChain pipeline
+- Component-removal ablations
+
+Additional comparisons, especially cross-dataset experiments and a
+classical TF-IDF plus logistic regression baseline, remain good next
+steps once the ISOT checkpoint is available.
 
 ### 4.4 Evaluation Metrics
 
-We evaluate using Accuracy, Precision, Recall, F1-score,
-and ROC-AUC. Additionally, we introduce three research-specific
-metrics: Hallucination Rate (HR), Evidence Recall, and
-Faithfulness Score, evaluated using the RAGAS framework.
+The current evaluation module computes:
 
----
+- Accuracy
+- Precision
+- Recall
+- Weighted F1
+- ROC-AUC
+- Hallucination Rate
+- Evidence Recall
 
-## 5. Results
+Confusion matrix and confidence distribution plots are also supported.
+Because the evidence recall logic was tightened in this pass, that metric
+should be rerun before being treated as final in the paper.
 
-### 5.1 RoBERTa Baseline Results
+## 5. Current Results
 
-Table 1 presents the performance of our fine-tuned RoBERTa-base
-classifier on the LIAR test set. The model was trained for 3
-epochs with a learning rate of 2e-5 and batch size of 16,
-with the best checkpoint selected based on validation F1.
+### 5.1 RoBERTa Baseline on LIAR
 
-| Model          | Accuracy | F1 (weighted) |
-|----------------|----------|---------------|
-| RoBERTa-base   | 0.6461   | 0.6443        |
+The saved LIAR RoBERTa results are:
 
-The model achieves 64.6% accuracy and 0.644 weighted F1,
-consistent with published BERT-based baselines on the LIAR
-dataset which range from 62-68% [Wang, 2017]. Notably, the
-model performs better on REAL claims (F1=0.70) than FAKE
-claims (F1=0.58), reflecting the inherent difficulty of
-detecting subtle misinformation in short political statements.
+| Model | Dataset | Accuracy | Weighted F1 | Epochs | Best Epoch |
+| --- | --- | ---: | ---: | ---: | ---: |
+| RoBERTa-base | LIAR | 0.6461 | 0.6443 | 3 | 2 |
 
-Validation F1 peaked at Epoch 2 (0.6588) before declining
-slightly at Epoch 3 (0.6425), indicating mild overfitting
-onset. The best checkpoint from Epoch 2 was used for all
-subsequent evaluations.
+These numbers show that a text-only transformer baseline is already
+reasonably competitive on LIAR. This is important because the retrieval
+and reasoning layers must improve on a non-trivial baseline, not on a
+weak one.
 
-These results establish our BERT-only baseline. The
-subsequent RAG pipeline and stacking ensemble are expected
-to improve upon this baseline — improvement magnitude
-constitutes our primary research contribution.
-```
+### 5.2 Current End-to-End LIAR Pipeline
 
----
+The saved full-pipeline evaluation currently covers a 50-claim LIAR
+sample. The results are:
 
-### 5.2 Full Pipeline Results
+| System | Sample Size | Accuracy | Weighted F1 | ROC-AUC | Hallucination Rate |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| EvidenceChain (current sample run) | 50 | 0.5000 | 0.4833 | 0.6208 | 0.4600 |
 
-Table 2 presents qualitative results of the complete 
-EvidenceChain pipeline on representative LIAR claims.
+At this stage, the integrated system does not yet outperform the
+RoBERTa-only baseline. This matters for interpretation: the project has
+successfully implemented the retrieval, decomposition, and reasoning
+modules, but the current retrieval corpus, aggregation strategy, and
+ensemble calibration are not yet strong enough to consistently convert
+those components into higher end-to-end accuracy.
 
-| Claim                        | RAG          | BERT | Final | Correct |
-|------------------------------|--------------|------|-------|---------|
-| COVID vaccines + infertility  | FALSE        | 0.50 | FAKE  | ✅      |
-| Unemployment 50-year low      | UNVERIFIABLE | 0.82 | REAL  | ✅      |
-| CDC self-destruct             | FALSE        | 0.27 | FAKE  | ✅      |
+### 5.3 Qualitative Behavior
 
-These results demonstrate the complementary nature of the 
-RAG and BERT components. For the unemployment claim, RAG 
-returned UNVERIFIABLE due to absence of current data in 
-the knowledge base, while RoBERTa correctly classified 
-the claim based on linguistic patterns. The ensemble 
-correctly deferred to BERT in this case. Conversely, 
-for the COVID vaccine claim, BERT was uncertain (p=0.50) 
-while RAG produced a confident FALSE verdict supported 
-by WHO evidence. The ensemble correctly deferred to RAG.
+The saved pipeline examples still demonstrate why the architecture is
+worth pursuing.
 
-This complementary behavior validates our stacking 
-ensemble design — neither component alone achieves 
-correct results across all claim types, but their 
-combination produces accurate verdicts in all three cases.
-```
+1. On the vaccine claim, decomposition separates "causes infertility"
+   from "banned in Europe", and both are contradicted by strong
+   evidence. This is an ideal use case for the retrieval and reasoning
+   stack.
+2. On the unemployment-rate claim, the retrieval layer lacks sufficient
+   temporal coverage, so the RAG branch returns `UNVERIFIABLE`. This
+   exposes a real limitation of the current knowledge base rather than
+   silently pretending certainty.
+3. On the CDC self-destruct claim, the decomposition and reasoning
+   pipeline correctly isolates a false operational claim and produces a
+   FAKE verdict.
 
----
+These examples suggest that the architecture is conceptually sound, but
+the evidence base still needs broader topical coverage and stronger
+calibration.
 
----
+## 6. Preliminary Ablation Findings
 
-## 6. Ablation Study
-*(to be completed on Day 16)*
+The repository includes a saved preliminary ablation run over 30 LIAR
+claims. The most important pattern is that the current full system is
+not yet stronger than the RoBERTa-only baseline:
 
----
+- Full EvidenceChain: 0.5333 accuracy, 0.5354 weighted F1
+- BERT Only: 0.6333 accuracy, 0.6243 weighted F1
+- RAG Only: 0.4333 accuracy, 0.2620 weighted F1
 
-## 7. Human Evaluation
-*(to be completed on Day 19)*
+This diagnostic is useful. It suggests that the main current bottleneck
+is not the text-only baseline but the retrieval-and-reasoning stack and
+its fusion with the baseline. The saved ablation script has also now
+been corrected so that the no-weighting setting removes weighting at the
+retrieval stage rather than only after ranking. The ablation should
+therefore be rerun after the ensemble is retrained on real validation
+features.
 
----
+## 7. Human Evaluation Protocol
+
+Although human evaluation has not yet been executed, the protocol can be
+defined clearly now.
+
+### 7.1 Goals
+
+The human study should answer four questions:
+
+1. Does decomposition produce sensible atomic sub-claims?
+2. Is the retrieved evidence relevant to the claim?
+3. Is the final explanation faithful to the evidence?
+4. Is the overall system output useful to a reader?
+
+### 7.2 Proposed Setup
+
+- Sample 100 claims from LIAR, with balanced REAL and FAKE labels.
+- Ask 3 annotators to independently review system outputs.
+- Provide the original claim, sub-claims, retrieved evidence, final
+  verdict, and explanation.
+- Score each item on a 1-5 scale for decomposition quality, evidence
+  relevance, explanation faithfulness, and usefulness.
+
+### 7.3 Agreement and Reporting
+
+- Report mean score and standard deviation for each dimension.
+- Compute inter-annotator agreement where applicable.
+- Include at least 5 failure cases with short qualitative commentary.
+
+This protocol is feasible with the current outputs and can be executed
+once the LIAR and ISOT runs are frozen.
 
 ## 8. Conclusion
-*(to be completed on Day 21)*
 
----
+EvidenceChain is currently a functioning research prototype with a
+completed LIAR preprocessing and baseline-training pipeline, a saved
+knowledge base, claim decomposition, LLM reasoning, hallucination
+tracking, and preliminary evaluation and ablation tooling. The project
+already demonstrates the practical value of decomposition and explicit
+evidence reasoning on selected examples. At the same time, the current
+quantitative results show that the integrated system is not yet better
+than the RoBERTa baseline, which is an important and honest outcome.
+
+The next steps are clear:
+
+1. Finish ISOT RoBERTa training and add ISOT results.
+2. Retrain the ensemble on real validation-set features.
+3. Expand the evidence base beyond the current 50-document prototype.
+4. Rerun full evaluation and ablation with the corrected reporting code.
+5. Add SHAP-based feature analysis and the planned human evaluation.
+
+With these updates, the project can move from a strong prototype into a
+more complete research contribution.
 
 ## References
-*(added progressively as we cite)*
 
-[Wang, 2017] Wang, W. Y. (2017). "Liar, Liar Pants on Fire":
-A New Benchmark Dataset for Fake News Detection. ACL 2017.
+[Ahmed et al., 2020] Ahmed, H., Traore, I., and Saad, S. Detecting
+opinion spams and fake news using text classification.
 
-[Liu et al., 2019] Liu, Y., et al. RoBERTa: A Robustly Optimized
-BERT Pretraining Approach. arXiv:1907.11692.
+[Lewis et al., 2020] Lewis, P., Perez, E., Piktus, A., et al.
+Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks.
 
-[Ahmed et al., 2020] Ahmed, H., et al. Detecting opinion spams
-and fake news using text classification. Security and Privacy.
+[Liu et al., 2019] Liu, Y., Ott, M., Goyal, N., et al. RoBERTa: A
+Robustly Optimized BERT Pretraining Approach.
 
-[Zhou et al., 2020] Zhou, X., et al. SAFE: Similarity-Aware
-Multi-modal Fake News Detection. PAKDD 2020.
-```
+[Reimers and Gurevych, 2019] Reimers, N. and Gurevych, I.
+Sentence-BERT: Sentence Embeddings using Siamese BERT-Networks.
+
+[Thorne et al., 2018] Thorne, J., Vlachos, A., Christodoulopoulos, C.,
+and Mittal, A. FEVER: a Large-scale Dataset for Fact Extraction and
+VERification.
+
+[Wang, 2017] Wang, W. Y. "Liar, Liar Pants on Fire": A New Benchmark
+Dataset for Fake News Detection.

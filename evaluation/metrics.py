@@ -23,6 +23,22 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import config
 
 
+def _resolve_bert_results_path():
+    """
+    Prefer the dataset-specific BERT results file.
+    Fall back to the legacy LIAR file if that is the only artifact present.
+    """
+
+    preferred = os.path.join(
+        config.TABLES_DIR, f"bert_results_{config.DATASET}.csv"
+    )
+    if os.path.exists(preferred):
+        return preferred
+
+    legacy = os.path.join(config.TABLES_DIR, "bert_results.csv")
+    return legacy
+
+
 def compute_classification_metrics(labels, predictions, probabilities=None):
     """
     Computes standard classification metrics.
@@ -84,8 +100,8 @@ def compute_evidence_recall(pipeline_results, relevant_threshold=0.45):
     """
     Computes Evidence Recall — did we retrieve relevant evidence?
     
-    Evidence Recall = claims with at least one strong evidence /
-                      total claims
+    Evidence Recall = claims with at least one strong retrieved
+                      evidence / total claims
                       
     Strong evidence = similarity score > relevant_threshold
     
@@ -101,10 +117,14 @@ def compute_evidence_recall(pipeline_results, relevant_threshold=0.45):
     relevant = 0
 
     for r in pipeline_results:
-        # Check if any sub-result had strong evidence
+        # Count a claim as successfully grounded only when at least
+        # one sub-claim had genuinely strong retrieval similarity.
         sub_results = r.get("sub_results", [])
-        if sub_results:
-            relevant += 1  # evidence was retrieved and reasoned over
+        if any(
+            sr.get("max_similarity", 0.0) >= relevant_threshold
+            for sr in sub_results
+        ):
+            relevant += 1
 
     return round(relevant / total, 4) if total > 0 else 0.0
 
@@ -306,9 +326,7 @@ if __name__ == "__main__":
 
     # Results comparison table
     # BERT baseline from bert_results.csv
-    bert_results = pd.read_csv(
-        os.path.join(config.TABLES_DIR, "bert_results.csv")
-    )
+    bert_results = pd.read_csv(_resolve_bert_results_path())
 
     comparison = {
         "BERT-only" : {

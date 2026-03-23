@@ -1,484 +1,201 @@
-# EvidenceChain — Simple Notes
+# EvidenceChain - Simple Notes
 
-## Title
+## What is this project?
 
-This project builds a smart system to detect fake news by:
+This project builds a fake news detection system that does not only say
+"fake" or "real". It tries to explain why.
 
-* Breaking claims into smaller parts
-* Finding real evidence from trusted sources
-* Checking how recent and reliable the evidence is
-* Giving a final answer with explanation
+The system does this by combining:
 
----
+1. a text model (RoBERTa)
+2. a retrieval system (FAISS)
+3. an LLM for reasoning over evidence
+4. a final ensemble that combines the signals
 
-## 1. Introduction
+## What problem are we trying to solve?
 
-Fake news is spreading very fast on the internet and social media.
-This is dangerous because it can:
+Normal fake news classifiers have three common problems:
 
-* Mislead people
-* Affect elections
-* Harm people’s health
+1. They treat a big sentence as one claim even when it contains many
+   smaller claims.
+2. They do not use real evidence properly.
+3. They can sound confident even when the answer is not grounded in
+   evidence.
 
-Even though many fake news detection systems exist, they still have 3 major problems:
+EvidenceChain was designed to reduce these problems.
 
-### Problem 1 — Multiple Claims Problem
+## Main idea of EvidenceChain
 
-Some sentences contain multiple claims, but systems treat them as one.
+When a claim comes in, the system works like this:
 
-Example:
-“Vaccines cause infertility and are banned in Europe”
+1. Clean the text.
+2. Break the claim into smaller sub-claims.
+3. Search a knowledge base for relevant evidence.
+4. Ask an LLM to judge each sub-claim using only that evidence.
+5. Check whether the LLM may be hallucinating.
+6. Run RoBERTa on the original claim.
+7. Combine both branches into one final verdict.
 
-This has 2 claims:
+## What are we using and why?
 
-1. Vaccines cause infertility
-2. Vaccines are banned in Europe
+### LIAR dataset
 
-Current systems cannot separate them, so they may give wrong results.
+We use LIAR because it contains short political claims and useful
+metadata such as speaker and subject. That makes it a good dataset for
+claim-level verification.
 
----
+### ISOT dataset
 
-### Problem 2 — All Sources Treated Equal
+We also use ISOT because it contains long news articles. It helps test
+whether the project can handle longer inputs and article-level fake news.
 
-Systems treat all information sources the same.
+Important note:
 
-But in reality:
+- ISOT preprocessing is already done.
+- ISOT model training is still running.
+- So the current completed results are mainly for LIAR.
 
-* Reuters = highly reliable
-* Random blog = not reliable
+### RoBERTa
 
-Also, systems don’t consider time.
+We use RoBERTa as the main text-only baseline because it is a strong
+transformer model for classification. It gives us a solid benchmark to
+beat.
 
-Old information may be wrong today.
+### MiniLM embeddings
 
----
+We use `all-MiniLM-L6-v2` to turn claims and evidence into vectors. It
+is fast and works well for semantic similarity.
 
-### Problem 3 — AI Hallucination Problem
+### FAISS
 
-AI models sometimes give answers without real evidence.
+We use FAISS because it is a simple and fast way to search through
+vector embeddings.
 
-They may:
+### Groq + Llama 3.3 70B
 
-* Guess answers
-* Use old memory
-* Sound confident but be wrong
+We use an LLM to do two jobs:
 
-This is called hallucination, and current systems do not measure it.
+1. break claims into smaller verifiable parts
+2. reason over evidence and give a verdict
 
----
+### Logistic Regression ensemble
 
-## Our Solution — EvidenceChain
+We use a small and interpretable final model to combine:
 
-We solve these problems using 3 ideas:
+- RoBERTa probability
+- RAG confidence
+- retrieval similarity
+- source credibility
+- hallucination flag
+- number of sub-claims
 
-### C1 — Break Claims
+## What is special about this project?
 
-We break a big claim into smaller parts and check each separately.
+### C1 - Claim decomposition
 
----
-
-### C2 — Smart Evidence Ranking
-
-We give importance to:
-
-* Recent information
-* Trusted sources
-
----
-
-### C3 — Hallucination Check
-
-We check if the AI answer is actually supported by real evidence.
-
-We also measure this using a metric called:
-Hallucination Rate (HR)
-
----
-
-## Models Used
-
-We combine:
-
-* RoBERTa (language understanding model)
-* Ensemble model (combining multiple outputs)
-
-Datasets used:
-
-* LIAR dataset
-* ISOT dataset
-
----
-
-## 3. Methodology (Simple)
-
-The system works in steps:
-
-1. Clean the input text
-2. Break the claim into smaller parts
-3. Find related evidence
-4. Let AI analyze evidence
-5. Check for hallucination
-6. Use BERT/RoBERTa for text classification
-7. Combine results
-8. Generate explanation
-
----
-
-## 3.2 Configuration (Simple)
-
-* We fix random seed = 42 (for same results every time)
-* We use RoBERTa instead of BERT because it performs better
-* We use MiniLM model for sentence similarity
-* We retrieve top 5 most relevant pieces of evidence
-
----
-
-### Hallucination Detection Rule
-
-We use two conditions:
-
-* Evidence similarity must be ≥ 0.45
-* AI confidence must be ≤ 0.75
-
-If not, we mark it as unreliable
-
----
-
-## 4. Experimental Setup
-
-### Datasets
-
-## 4.1 Datasets
-
-We test our system using two different datasets to check how well it works on:
-
-* Short claims
-* Long news articles
-* Different types of content
-
----
-
-### LIAR Dataset
-
-* Contains 12,800 short political statements
-* Collected from PolitiFact
-* Each statement is checked by humans
-
-It has 6 labels:
-
-* true
-* mostly true
-* half true
-* barely true
-* false
-* pants on fire
-
-We convert these into 2 classes:
-
-REAL (1):
-
-* true
-* mostly true
-* half true
-
-FAKE (0):
-
-* barely true
-* false
-* pants on fire
-
----
-
-### Extra Feature (Important)
-
-LIAR also gives extra information like:
-
-* Who said the statement
-* Their political party
-* Their past truth history
-
-We use this as additional input in our final model (ensemble).
-
----
-
-### ISOT Dataset (Simple)
-
-* Contains 44,000 full news articles
-* Real news from Reuters
-* Fake news from unreliable websites
-
-Unlike LIAR:
-
-* This dataset has full articles (long text)
-
-This helps test:
-
-* Writing style
-* Fake news patterns
-* Manipulation in long content
-
----
-
-### Why We Use Both Datasets
-
-We use both because they test different things:
-
-LIAR:
-
-* Short statements
-* Needs logical reasoning
-* Helps test claim decomposition
-
-ISOT:
-
-* Long articles
-* Needs language understanding
-* Helps test RoBERTa model
-
----
-
-### Cross Testing (Very Important)
-
-We also test like this:
-
-* Train on LIAR → Test on ISOT
-* Train on ISOT → Test on LIAR
-
-This checks:
-👉 Can our model work on new types of data?
-
----
-
-## Final Understanding
-
-LIAR → tests reasoning on small claims
-ISOT → tests understanding of full articles
-
-Using both makes our system more strong and reliable
-
-
-### Data Split
-
-* 80% training
-* 10% validation
-* 10% testing
-
-We also test:
-
-* Train on LIAR → Test on ISOT
-* Train on ISOT → Test on LIAR
-
----
-
-### Baselines (Comparison Models)
-
-We compare our model with:
-
-1. TF-IDF + Logistic Regression
-2. BERT-only model
-3. RAG-only system
-4. SAFE model
-5. Other state-of-the-art models
-
----
-
-### Evaluation Metrics
-
-We measure performance using:
-
-* Accuracy
-* Precision
-* Recall
-* F1-score
-* ROC-AUC
-
-Extra important metrics:
-
-* Hallucination Rate → how often AI gives unsupported answers
-* Evidence Recall → did we retrieve correct evidence
-* Faithfulness Score → does answer match evidence
-
----
-
-## Data Preprocessing 
-Before giving the data to our models, we clean and prepare it properly.
-
----
-
-### Text Cleaning
-
-We apply the following steps:
-
-* Convert all text to lowercase
-* Remove URLs (links)
-* Remove special characters (except apostrophes like "n't")
-* Keep numbers (because they are important in claims)
-
----
-
-### Why Keep Apostrophes?
-
-Because they help in meaning:
+Instead of checking one long sentence as one unit, we split it into
+smaller facts.
 
 Example:
 
-* "is not" vs "isn't"
+"COVID vaccines cause infertility and are banned in Europe"
 
-Both show negation, which is very important for detecting fake news.
+This becomes:
 
----
+1. COVID vaccines cause infertility
+2. COVID vaccines are banned in Europe
 
-### Special Case Handling
+This is useful because one part can be true and another part can be
+false.
 
-Some claims in the LIAR dataset start with the word "Says".
+### C2 - Better evidence ranking
 
-Example:
-"Says vaccines are harmful"
+We do not rank evidence only by similarity.
 
-We remove "Says" so that we only keep the actual claim.
+We also look at:
 
----
+- source credibility
+- recency
 
-### Handling Missing Data
+So a recent Reuters or WHO document should matter more than a weak
+source.
 
-Some fields are missing, like:
+### C3 - Hallucination check
 
-* job title (28%)
-* state info (21%)
-* context (1%)
+If the LLM gives a high-confidence answer but the retrieved evidence is
+weak, we flag that output as suspicious.
 
-Instead of leaving them empty, we replace them with:
-"unknown"
+This is a practical way to track grounding quality.
 
-This helps the model understand that the data is missing.
+## What has already been completed?
 
----
+### Completed now
 
-### Stopwords (Important Decision)
+- LIAR loading and preprocessing
+- ISOT loading and preprocessing
+- LIAR RoBERTa baseline training
+- FAISS knowledge base building
+- claim decomposition
+- evidence retrieval
+- LLM reasoning
+- hallucination flagging
+- full LIAR pipeline
+- evaluation and ablation scripts
 
-We do NOT remove stopwords like:
+### Still pending
 
-* not
-* is
-* the
+- finish ISOT RoBERTa training
+- retrain the ensemble on real validation features
+- rerun full evaluation after the latest code fixes
+- rerun ablation after ensemble retraining
+- add SHAP explainability
+- run human evaluation
 
-Because:
+## What do the current saved results show?
 
-* Words like "not" are very important for meaning
-* RoBERTa understands full sentences better when all words are present
+### RoBERTa baseline on LIAR
 
----
+- Accuracy: 0.6461
+- Weighted F1: 0.6443
 
-### Final Input Format
+This means the text-only baseline is already fairly strong.
 
-We combine all information into one structured format:
+### Current full pipeline sample on LIAR
 
-[CLAIM] claim_text
-[SPEAKER] speaker_name
-[SUBJECT] subject
+- Accuracy: 0.5000
+- Weighted F1: 0.4833
+- ROC-AUC: 0.6208
+- Hallucination rate: 0.46
 
----
+This means the full architecture is working, but it still needs
+improvement before it can beat the RoBERTa baseline consistently.
 
-### Example
+## Why is that okay in a research project?
 
-[CLAIM] vaccines are not safe
-[SPEAKER] John Doe
-[SUBJECT] health
+Because research is not only about getting a better number quickly.
 
----
+It is also about:
 
-### Why This Helps
+- building a clear pipeline
+- understanding where the system fails
+- showing which parts help and which parts still need work
 
-This format allows the model to:
+Right now the project has reached the point where the architecture is
+implemented and the main weakness is clear: the retrieval and fusion
+parts need to become stronger.
 
-* Understand the claim
-* Consider who said it
-* Understand the topic
+## What should happen next?
 
-So the model makes better predictions using both text and context.
+1. Finish ISOT training.
+2. Save the ISOT results.
+3. Train the ensemble on real validation-set features.
+4. Expand the evidence base.
+5. Rerun evaluation and ablation.
+6. Add SHAP and human evaluation.
 
----
+## One-line explanation for anyone
 
-## Final Understanding
-
-Data preprocessing helps:
-
-* Clean the text
-* Keep important meaning
-* Handle missing data properly
-* Add extra useful information
-
-This improves the overall performance of the system.
-
-## Dataset Analysis
-
-We analyzed the LIAR dataset to understand its properties before using it.
-
----
-
-### Size and Label Distribution
-
-* Total training samples: 10,269
-* REAL: 56.2%
-* FAKE: 43.8%
-
-This means the dataset is almost balanced.
-
----
-
-### Why Not Only Accuracy?
-
-Since the data is slightly imbalanced, accuracy alone is not enough.
-
-So we use:
-👉 F1-score (better metric for balanced evaluation)
-
----
-
-### Statement Length
-
-* Minimum length: 2 words
-* Maximum length: 66 words
-* Average length: ~18 words
-
-This shows:
-👉 The dataset contains short and compact claims
-
-This is good for our system because:
-👉 It works well with claim decomposition
-
----
-
-### Missing Data
-
-Some metadata is missing:
-
-* job_title missing in 28% cases
-* state_info missing in 21% cases
-
-We replace missing values with:
-👉 "unknown"
-
----
-
-### Speakers in Dataset
-
-Most claims are from political figures:
-
-* Barack Obama → 493 claims
-* Donald Trump → 274 claims
-* Hillary Clinton → 239 claims
-
-This shows:
-👉 The dataset mainly focuses on political statements
-
----
-
-## Final Understanding
-
-* Data is nearly balanced
-* Claims are short and suitable for analysis
-* Some metadata is missing but handled properly
-* Dataset is focused on political figures
-
-This helps us design our system more effectively.
+EvidenceChain is a fake news detector that breaks a claim into smaller
+facts, finds supporting evidence, checks whether the AI is grounded, and
+then combines that evidence-based reasoning with a strong RoBERTa
+baseline.

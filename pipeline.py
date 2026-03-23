@@ -20,6 +20,21 @@ from modules.ensemble     import StackingEnsemble
 import config
 
 
+def _resolve_roberta_model_dir():
+    """
+    Prefer the dataset-specific RoBERTa checkpoint when it exists.
+    Fall back to the LIAR checkpoint so the pipeline remains usable
+    while ISOT training is still in progress.
+    """
+
+    preferred = os.path.join(config.MODELS_DIR, f"roberta_{config.DATASET}")
+    if os.path.isdir(preferred):
+        return preferred
+
+    fallback = os.path.join(config.MODELS_DIR, "roberta_liar")
+    return fallback
+
+
 class EvidenceChain:
     """
     Full EvidenceChain pipeline.
@@ -44,7 +59,7 @@ class EvidenceChain:
 
         # Load trained BERT model
         print("Loading RoBERTa model...")
-        bert_path       = os.path.join(config.MODELS_DIR, "roberta_liar")
+        bert_path       = _resolve_roberta_model_dir()
         self.tokenizer  = RobertaTokenizer.from_pretrained(bert_path)
         self.bert_model = RobertaForSequenceClassification.from_pretrained(
             bert_path
@@ -140,6 +155,7 @@ class EvidenceChain:
                 result["source_weight_avg"] = 0.3
                 result["max_similarity"]    = 0.0
 
+            result["evidence_count"] = len(evidence)
             sub_claim_results.append(result)
 
             print(f"\n    Sub-claim : {sc}")
@@ -181,15 +197,22 @@ class EvidenceChain:
             "sub_claims"     : sub_claims,
             "rag_verdict"    : rag_result["final_verdict"],
             "rag_confidence" : rag_result["final_confidence"],
+            "rag_max_similarity": rag_result["max_similarity"],
+            "rag_source_weight_avg": rag_result["source_weight_avg"],
             "bert_prob"      : round(bert_prob, 4),
             "final_verdict"  : final["final_verdict"],
             "confidence"     : final["confidence"],
             "hallucinated"   : rag_result["hallucination_flag"],
             "sub_results"    : [
                 {
-                    "sub_claim" : sub_claims[i],
-                    "verdict"   : sub_claim_results[i]["verdict"],
-                    "reasoning" : sub_claim_results[i]["reasoning"]
+                    "sub_claim"          : sub_claims[i],
+                    "verdict"            : sub_claim_results[i]["verdict"],
+                    "confidence"         : sub_claim_results[i]["confidence"],
+                    "reasoning"          : sub_claim_results[i]["reasoning"],
+                    "max_similarity"     : sub_claim_results[i]["max_similarity"],
+                    "source_weight_avg"  : sub_claim_results[i]["source_weight_avg"],
+                    "hallucination_flag" : sub_claim_results[i]["hallucination_flag"],
+                    "evidence_count"     : sub_claim_results[i]["evidence_count"]
                 }
                 for i in range(len(sub_claims))
             ]
