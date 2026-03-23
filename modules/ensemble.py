@@ -4,52 +4,53 @@
 #
 # Why stacking?
 # Simple averaging: final = 0.5*BERT + 0.5*RAG
-# This assumes both are equally reliable always — wrong.
+# This assumes both are equally reliable always â€” wrong.
 # Stacking trains a meta-classifier to learn optimal weights
-# from validation data — data-driven, not hand-tuned.
+# from validation data â€” data-driven, not hand-tuned.
 
 import os
 import sys
+import pickle
 import numpy as np
 import pandas as pd
-import pickle
+import torch
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import accuracy_score, f1_score, classification_report
+from sklearn.metrics import accuracy_score, f1_score
 from sklearn.preprocessing import StandardScaler
+from transformers import RobertaTokenizer, RobertaForSequenceClassification
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import config
+from modules.preprocessor import preprocess_text
+from modules.retriever import Retriever
+from modules.decomposer import ClaimDecomposer
+from modules.reasoner import EvidenceReasoner
 
 
 class StackingEnsemble:
     """
     Meta-classifier that combines BERT and RAG outputs.
-    
+
     Input features:
-      1. bert_prob          — BERT probability of REAL (0-1)
-      2. rag_confidence     — RAG verdict confidence (0-1)
-      3. max_similarity     — best evidence similarity score
-      4. source_weight_avg  — average source credibility
-      5. hallucination_flag — 1 if hallucinated, 0 if not
-      6. sub_claim_count    — how many sub-claims were found
-    
+      1. bert_prob          â€” BERT probability of REAL (0-1)
+      2. rag_confidence     â€” RAG verdict confidence (0-1)
+      3. max_similarity     â€” best evidence similarity score
+      4. source_weight_avg  â€” average source credibility
+      5. hallucination_flag â€” 1 if hallucinated, 0 if not
+      6. sub_claim_count    â€” how many sub-claims were found
+
     Why Logistic Regression as meta-classifier?
     Simple, interpretable, works well with small feature sets.
-    SHAP values are meaningful on LR — directly shows which
+    SHAP values are meaningful on LR â€” directly shows which
     feature drove the final decision.
-    XGBoost is included as alternative — compared in ablation.
     """
 
     def __init__(self):
-        # Why StandardScaler?
-        # Features have different scales:
-        # bert_prob is 0-1, sub_claim_count could be 1-5
-        # Scaling ensures no feature dominates due to magnitude
-        self.scaler     = StandardScaler()
+        self.scaler = StandardScaler()
         self.classifier = LogisticRegression(
-            random_state = config.RANDOM_SEED,
-            max_iter     = 1000,    # ensure convergence
-            C            = 1.0      # regularization strength
+            random_state=config.RANDOM_SEED,
+            max_iter=1000,
+            C=1.0
         )
         self.is_trained = False
         self.feature_names = [
@@ -64,26 +65,15 @@ class StackingEnsemble:
     def build_feature_vector(self, bert_prob, rag_result):
         """
         Builds input feature vector from BERT and RAG outputs.
-        
-        Args:
-            bert_prob  : float — BERT probability of REAL class
-            rag_result : dict  — output from reasoner.aggregate_sub_claim_verdicts()
-            
-        Returns:
-            numpy array of shape (1, 6)
         """
 
-        # Convert hallucination flag to numeric
         hallucination = 1.0 if rag_result.get("hallucination_flag") else 0.0
 
-        # Convert RAG verdict to confidence direction
-        # If verdict is FALSE, confidence points toward FAKE
-        # If verdict is TRUE, confidence points toward REAL
         rag_conf = rag_result.get("final_confidence", 0.5)
         if rag_result.get("final_verdict") == "FALSE":
-            rag_conf = 1.0 - rag_conf  # flip toward FAKE
+            rag_conf = 1.0 - rag_conf
 
-        features = np.array([[
+        return np.array([[
             bert_prob,
             rag_conf,
             rag_result.get("max_similarity", 0.0),
@@ -92,65 +82,41 @@ class StackingEnsemble:
             float(rag_result.get("sub_claim_count", 1))
         ]])
 
-        return features
-
     def train(self, feature_matrix, labels):
         """
         Trains the meta-classifier on validation set features.
-        
-        Why train on validation set not training set?
-        BERT and RAG were trained/tuned on training set.
-        Using training set for ensemble = data leakage.
-        Validation set is unseen by both models — clean signal.
-        
-        Args:
-            feature_matrix : np.array of shape (n_samples, 6)
-            labels         : list of 0/1 labels
         """
 
         print("Training stacking ensemble...")
         print(f"  Samples  : {len(labels)}")
         print(f"  Features : {self.feature_names}")
 
-        # Scale features
         X_scaled = self.scaler.fit_transform(feature_matrix)
-
-        # Train meta-classifier
         self.classifier.fit(X_scaled, labels)
         self.is_trained = True
 
-        # Training accuracy
         train_preds = self.classifier.predict(X_scaled)
-        train_acc   = accuracy_score(labels, train_preds)
-        train_f1    = f1_score(labels, train_preds, average="weighted")
+        train_acc = accuracy_score(labels, train_preds)
+        train_f1 = f1_score(labels, train_preds, average="weighted")
 
         print(f"  Train Acc : {train_acc:.4f}")
         print(f"  Train F1  : {train_f1:.4f}")
 
-        # Feature importance via coefficients
-        # Positive coefficient = feature pushes toward REAL
-        # Negative coefficient = feature pushes toward FAKE
         print("\n  Feature Coefficients:")
-        for name, coef in zip(
-            self.feature_names, self.classifier.coef_[0]
-        ):
-            direction = "→ REAL" if coef > 0 else "→ FAKE"
+        for name, coef in zip(self.feature_names, self.classifier.coef_[0]):
+            direction = "â†’ REAL" if coef > 0 else "â†’ FAKE"
             print(f"    {name:<22} : {coef:+.4f}  {direction}")
 
     def predict(self, feature_matrix):
         """
         Predicts final verdict for given features.
-        
-        Returns:
-            predictions : np.array of 0/1 labels
-            probabilities: np.array of REAL probabilities
         """
 
         if not self.is_trained:
             raise ValueError("Ensemble not trained yet. Call train() first.")
 
-        X_scaled      = self.scaler.transform(feature_matrix)
-        predictions   = self.classifier.predict(X_scaled)
+        X_scaled = self.scaler.transform(feature_matrix)
+        predictions = self.classifier.predict(X_scaled)
         probabilities = self.classifier.predict_proba(X_scaled)[:, 1]
 
         return predictions, probabilities
@@ -159,24 +125,21 @@ class StackingEnsemble:
         """
         Predicts verdict for a single claim.
         Convenience wrapper for pipeline use.
-        
-        Returns:
-            dict with final_verdict, confidence
         """
 
-        features      = self.build_feature_vector(bert_prob, rag_result)
-        preds, probs  = self.predict(features)
+        features = self.build_feature_vector(bert_prob, rag_result)
+        preds, probs = self.predict(features)
 
-        verdict    = "REAL" if preds[0] == 1 else "FAKE"
+        verdict = "REAL" if preds[0] == 1 else "FAKE"
         confidence = float(probs[0]) if preds[0] == 1 else 1.0 - float(probs[0])
 
         return {
-            "final_verdict"    : verdict,
-            "confidence"       : round(confidence, 4),
-            "bert_prob"        : round(bert_prob, 4),
-            "rag_verdict"      : rag_result.get("final_verdict"),
-            "rag_confidence"   : rag_result.get("final_confidence"),
-            "hallucination"    : rag_result.get("hallucination_flag")
+            "final_verdict"  : verdict,
+            "confidence"     : round(confidence, 4),
+            "bert_prob"      : round(bert_prob, 4),
+            "rag_verdict"    : rag_result.get("final_verdict"),
+            "rag_confidence" : rag_result.get("final_confidence"),
+            "hallucination"  : rag_result.get("hallucination_flag")
         }
 
     def save(self, path=None):
@@ -187,9 +150,9 @@ class StackingEnsemble:
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, "wb") as f:
             pickle.dump({
-                "classifier" : self.classifier,
-                "scaler"     : self.scaler,
-                "features"   : self.feature_names
+                "classifier": self.classifier,
+                "scaler"    : self.scaler,
+                "features"  : self.feature_names
             }, f)
         print(f"Ensemble saved to {path}")
 
@@ -201,64 +164,200 @@ class StackingEnsemble:
         with open(path, "rb") as f:
             data = pickle.load(f)
 
-        self.classifier  = data["classifier"]
-        self.scaler      = data["scaler"]
+        self.classifier = data["classifier"]
+        self.scaler = data["scaler"]
         self.feature_names = data["features"]
-        self.is_trained  = True
+        self.is_trained = True
         print(f"Ensemble loaded from {path}")
 
 
-if __name__ == "__main__":
+def _resolve_liar_validation_assets():
+    """
+    Returns the LIAR validation file and checkpoint paths used for
+    ensemble training.
+    """
 
-    # Simulate what the full pipeline produces
-    # In production these come from BERT + RAG on real data
-    # Here we test the ensemble logic with synthetic data
+    data_path = os.path.join(config.DATA_PROCESSED, "val.csv")
+    model_path = os.path.join(config.MODELS_DIR, "roberta_liar")
 
-    print("Testing ensemble with synthetic data...")
-    print("="*55)
+    if not os.path.exists(data_path):
+        raise FileNotFoundError(f"Missing LIAR validation data: {data_path}")
+    if not os.path.isdir(model_path):
+        raise FileNotFoundError(f"Missing LIAR RoBERTa checkpoint: {model_path}")
 
-    np.random.seed(config.RANDOM_SEED)
-    n_samples = 200
+    return data_path, model_path
 
-    # Simulate feature matrix
-    # In real pipeline: built from BERT + RAG on val set
-    synthetic_features = np.column_stack([
-        np.random.uniform(0.3, 0.9, n_samples),  # bert_prob
-        np.random.uniform(0.4, 0.95, n_samples), # rag_confidence
-        np.random.uniform(0.3, 0.9, n_samples),  # max_similarity
-        np.random.uniform(0.6, 0.95, n_samples), # source_weight_avg
-        np.random.randint(0, 2, n_samples),       # hallucination_flag
-        np.random.randint(1, 4, n_samples)        # sub_claim_count
-    ]).astype(float)
 
-    # Synthetic labels — in real pipeline: from val set binary_label
-    synthetic_labels = np.random.randint(0, 2, n_samples)
+def _get_bert_probability(text, model, tokenizer, device):
+    """Returns RoBERTa probability of REAL for one claim."""
 
-    # Train ensemble
-    ensemble = StackingEnsemble()
-    ensemble.train(synthetic_features, synthetic_labels)
-
-    # Test prediction on single claim
-    print("\nSingle claim prediction test:")
-    test_rag_result = {
-        "final_verdict"      : "FALSE",
-        "final_confidence"   : 0.87,
-        "hallucination_flag" : False,
-        "sub_claim_count"    : 2,
-        "max_similarity"     : 0.82,
-        "source_weight_avg"  : 0.90
-    }
-
-    result = ensemble.predict_single(
-        bert_prob  = 0.34,   # BERT thinks 34% chance REAL = leans FAKE
-        rag_result = test_rag_result
+    clean = preprocess_text(text)
+    encoding = tokenizer(
+        clean,
+        max_length=config.BERT_MAX_LENGTH,
+        truncation=True,
+        padding="max_length",
+        return_tensors="pt"
     )
 
-    print(f"  BERT probability : {result['bert_prob']}")
-    print(f"  RAG verdict      : {result['rag_verdict']}")
-    print(f"  RAG confidence   : {result['rag_confidence']}")
-    print(f"  Final verdict    : {result['final_verdict']}")
-    print(f"  Confidence       : {result['confidence']}")
+    with torch.no_grad():
+        outputs = model(
+            input_ids=encoding["input_ids"].to(device),
+            attention_mask=encoding["attention_mask"].to(device)
+        )
 
-    # Save
+    probs = torch.softmax(outputs.logits, dim=1)
+    return probs[0][1].item()
+
+
+def _run_rag_branch(claim, decomposer, retriever, reasoner):
+    """
+    Runs the claim decomposition + retrieval + reasoning branch for one
+    LIAR claim and returns an aggregated RAG result.
+    """
+
+    clean_claim = preprocess_text(claim)
+    sub_claims = decomposer.decompose(clean_claim)
+    sub_results = []
+
+    for sub_claim in sub_claims:
+        evidence = retriever.retrieve(sub_claim, top_k=config.TOP_K_RETRIEVAL)
+        result = reasoner.reason(sub_claim, evidence)
+
+        if evidence:
+            result["source_weight_avg"] = round(
+                sum(e["source_weight"] for e in evidence) / len(evidence), 4
+            )
+            result["max_similarity"] = max(e["similarity"] for e in evidence)
+        else:
+            result["source_weight_avg"] = 0.3
+            result["max_similarity"] = 0.0
+
+        sub_results.append(result)
+
+    rag_result = reasoner.aggregate_sub_claim_verdicts(sub_results)
+    rag_result["max_similarity"] = round(
+        sum(r["max_similarity"] for r in sub_results) / len(sub_results), 4
+    )
+    rag_result["source_weight_avg"] = round(
+        sum(r["source_weight_avg"] for r in sub_results) / len(sub_results), 4
+    )
+
+    return rag_result
+
+
+def train_ensemble_on_validation(sample_size=None):
+    """
+    Generates real validation features from the LIAR validation set,
+    trains the ensemble, and saves both the trained model and feature
+    table for inspection.
+
+    Why LIAR only?
+    The current RAG pipeline is built for short, claim-style inputs.
+    Using the same decomposition and reasoning flow on full ISOT
+    articles would produce weak and misleading ensemble features.
+    """
+
+    data_path, model_path = _resolve_liar_validation_assets()
+
+    print("=" * 65)
+    print("  TRAINING STACKING ENSEMBLE ON LIAR VALIDATION FEATURES")
+    print("=" * 65)
+    print(f"Validation data : {data_path}")
+    print(f"RoBERTa path    : {model_path}")
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Device          : {device}")
+
+    val_df = pd.read_csv(data_path)
+    val_df = val_df.dropna(subset=["binary_label", "statement"]).reset_index(drop=True)
+
+    if sample_size:
+        val_df = val_df.sample(sample_size, random_state=config.RANDOM_SEED)
+        val_df = val_df.reset_index(drop=True)
+
+    print(f"Validation rows : {len(val_df)}")
+
+    tokenizer = RobertaTokenizer.from_pretrained(model_path)
+    bert_model = RobertaForSequenceClassification.from_pretrained(model_path)
+    bert_model.to(device)
+    bert_model.eval()
+
+    decomposer = ClaimDecomposer()
+    retriever = Retriever()
+    reasoner = EvidenceReasoner()
+    ensemble = StackingEnsemble()
+
+    feature_rows = []
+
+    for idx, row in val_df.iterrows():
+        claim = str(row["statement"])
+        label = int(row["binary_label"])
+
+        try:
+            rag_result = _run_rag_branch(
+                claim, decomposer, retriever, reasoner
+            )
+            bert_prob = _get_bert_probability(
+                claim, bert_model, tokenizer, device
+            )
+            feature_vector = ensemble.build_feature_vector(
+                bert_prob, rag_result
+            )[0]
+
+            feature_rows.append({
+                "claim"              : claim,
+                "label"              : label,
+                "bert_prob"          : feature_vector[0],
+                "rag_confidence"     : feature_vector[1],
+                "max_similarity"     : feature_vector[2],
+                "source_weight_avg"  : feature_vector[3],
+                "hallucination_flag" : feature_vector[4],
+                "sub_claim_count"    : feature_vector[5],
+                "rag_verdict"        : rag_result["final_verdict"],
+                "rag_raw_confidence" : rag_result["final_confidence"]
+            })
+
+            if (idx + 1) % 25 == 0:
+                print(f"  Processed {idx + 1}/{len(val_df)}")
+
+        except Exception as exc:
+            print(f"  Warning: failed on validation row {idx} - {exc}")
+
+    if not feature_rows:
+        raise RuntimeError("No validation features were generated.")
+
+    features_df = pd.DataFrame(feature_rows)
+    X = features_df[ensemble.feature_names].to_numpy(dtype=float)
+    y = features_df["label"].to_numpy(dtype=int)
+
+    ensemble.train(X, y)
+    preds, _ = ensemble.predict(X)
+
+    metrics = {
+        "dataset"  : "liar",
+        "samples"  : int(len(features_df)),
+        "accuracy" : round(accuracy_score(y, preds), 4),
+        "f1"       : round(f1_score(y, preds, average="weighted"), 4)
+    }
+
+    print("\nValidation metrics after ensemble training:")
+    for key, value in metrics.items():
+        print(f"  {key:<10}: {value}")
+
+    os.makedirs(config.TABLES_DIR, exist_ok=True)
+    features_path = os.path.join(config.TABLES_DIR, "ensemble_features_liar.csv")
+    metrics_path = os.path.join(config.TABLES_DIR, "ensemble_results_liar.csv")
+
+    features_df.to_csv(features_path, index=False)
+    pd.DataFrame([metrics]).to_csv(metrics_path, index=False)
     ensemble.save()
+
+    print(f"\nSaved features to {features_path}")
+    print(f"Saved metrics  to {metrics_path}")
+
+    return features_df, metrics
+
+
+if __name__ == "__main__":
+    train_ensemble_on_validation()
