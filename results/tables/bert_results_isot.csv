@@ -1,0 +1,2 @@
+dataset,model,max_length,train_batch_size,eval_batch_size,epochs_requested,best_checkpoint,best_metric,test_accuracy,test_f1_score
+isot,roberta-base,256,16,16,3,/content/drive/MyDrive/EvidenceChain_runs/isot_roberta_t4/checkpoint-4490,0.99977728193353,0.999554565701559,0.999554565701559

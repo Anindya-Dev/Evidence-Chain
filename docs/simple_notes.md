@@ -52,8 +52,9 @@ whether the project can handle longer inputs and article-level fake news.
 Important note:
 
 - ISOT preprocessing is already done.
-- ISOT model training is still running.
-- So the current completed results are mainly for LIAR.
+- ISOT model training is complete.
+- The ISOT baseline score is extremely high, so we should interpret it
+  carefully.
 
 ### RoBERTa
 
@@ -134,6 +135,7 @@ This is a practical way to track grounding quality.
 - LIAR loading and preprocessing
 - ISOT loading and preprocessing
 - LIAR RoBERTa baseline training
+- ISOT RoBERTa baseline training
 - FAISS knowledge base building
 - claim decomposition
 - evidence retrieval
@@ -144,10 +146,10 @@ This is a practical way to track grounding quality.
 
 ### Still pending
 
-- finish ISOT RoBERTa training
 - retrain the ensemble on real validation features
 - rerun full evaluation after the latest code fixes
 - rerun ablation after ensemble retraining
+- run cross-dataset evaluation
 - add SHAP explainability
 - run human evaluation
 
@@ -170,6 +172,15 @@ This means the text-only baseline is already fairly strong.
 This means the full architecture is working, but it still needs
 improvement before it can beat the RoBERTa baseline consistently.
 
+### ISOT RoBERTa baseline
+
+- Accuracy: 0.9996
+- Weighted F1: 0.9996
+
+This is extremely high. That does not automatically mean the model is
+perfect in the real world. It more likely means ISOT is an easier
+dataset with strong source/style patterns.
+
 ## Why is that okay in a research project?
 
 Because research is not only about getting a better number quickly.
@@ -186,12 +197,11 @@ parts need to become stronger.
 
 ## What should happen next?
 
-1. Finish ISOT training.
-2. Save the ISOT results.
-3. Train the ensemble on real validation-set features.
-4. Expand the evidence base.
-5. Rerun evaluation and ablation.
-6. Add SHAP and human evaluation.
+1. Train the ensemble on real validation-set features.
+2. Expand the evidence base.
+3. Rerun evaluation and ablation.
+4. Run cross-dataset evaluation.
+5. Add SHAP and human evaluation.
 
 ## One-line explanation for anyone
 

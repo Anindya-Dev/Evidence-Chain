@@ -16,16 +16,17 @@ sub-claims, (2) source-credibility and temporal weighting during
 retrieval, and (3) an explicit hallucination flag based on the
 relationship between retrieval similarity and LLM confidence. The
 current repository contains a completed LIAR-based pipeline, processed
-LIAR and ISOT datasets, a saved LIAR RoBERTa checkpoint, a saved
-knowledge base, and evaluation and ablation scripts. On LIAR, the
+LIAR and ISOT datasets, saved LIAR and ISOT RoBERTa checkpoints, a
+saved knowledge base, and evaluation and ablation scripts. On LIAR, the
 RoBERTa baseline currently achieves 0.6461 accuracy and 0.6443 weighted
-F1. The current end-to-end LIAR pipeline, evaluated on a saved sample of
-50 claims, achieves 0.5000 accuracy, 0.4833 weighted F1, 0.6208
-ROC-AUC, and a hallucination rate of 0.46. These results show that the
-retrieval and reasoning stack is implemented, but the current combined
-system still requires calibration before it can reliably outperform the
-text-only baseline. ISOT model training is in progress and will be added
-in the next revision.
+F1. On ISOT, a RoBERTa baseline with maximum sequence length 256
+achieves 0.9996 accuracy and 0.9996 weighted F1. The current end-to-end
+LIAR pipeline, evaluated on a saved sample of 50 claims, achieves
+0.5000 accuracy, 0.4833 weighted F1, 0.6208 ROC-AUC, and a
+hallucination rate of 0.46. These results show that the retrieval and
+reasoning stack is implemented, but the current combined LIAR system
+still requires calibration before it can reliably outperform the
+text-only baseline.
 
 ## 1. Introduction
 
@@ -71,11 +72,10 @@ The main contributions of this project are:
    evidence.
 
 This paper documents the current project state. The LIAR pipeline is
-implemented and evaluated. ISOT preprocessing is complete and ISOT model
-training is currently running outside this workspace. The paper is
-therefore written as a living draft: the LIAR methodology and results
-are concrete, while the ISOT and cross-dataset experiments are marked as
-the next update.
+implemented and evaluated. The paper is therefore written as a living
+draft: LIAR and ISOT baseline results are now concrete, while the
+cross-dataset and final full-pipeline experiments remain the next
+update.
 
 ## 2. Related Work
 
@@ -264,8 +264,9 @@ generalization to longer inputs.
 At the time of this draft:
 
 - LIAR preprocessing, training, and baseline evaluation are complete.
-- ISOT preprocessing is complete.
-- ISOT RoBERTa training is in progress outside this workspace.
+- ISOT preprocessing, training, and baseline evaluation are complete.
+- Cross-dataset evaluation and final ensemble recalibration are still
+  pending.
 
 ### 4.2 Configuration
 
@@ -310,18 +311,22 @@ should be rerun before being treated as final in the paper.
 
 ## 5. Current Results
 
-### 5.1 RoBERTa Baseline on LIAR
+### 5.1 RoBERTa Baselines on LIAR and ISOT
 
-The saved LIAR RoBERTa results are:
+The saved RoBERTa baseline results are:
 
-| Model | Dataset | Accuracy | Weighted F1 | Epochs | Best Epoch |
-| --- | --- | ---: | ---: | ---: | ---: |
-| RoBERTa-base | LIAR | 0.6461 | 0.6443 | 3 | 2 |
+| Model | Dataset | Max Length | Accuracy | Weighted F1 | Epochs | Best Epoch |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| RoBERTa-base | LIAR | 512 | 0.6461 | 0.6443 | 3 | 2 |
+| RoBERTa-base | ISOT | 256 | 0.9996 | 0.9996 | 3 | 1 |
 
 These numbers show that a text-only transformer baseline is already
-reasonably competitive on LIAR. This is important because the retrieval
-and reasoning layers must improve on a non-trivial baseline, not on a
-weak one.
+reasonably competitive on LIAR and almost saturated on ISOT. This
+contrast is important. LIAR behaves like a harder claim-verification
+benchmark, while ISOT appears to be much easier under the current split.
+The ISOT result should therefore be interpreted carefully, because it
+likely reflects strong source and style cues in addition to genuine
+semantic understanding.
 
 ### 5.2 Current End-to-End LIAR Pipeline
 
@@ -423,9 +428,10 @@ than the RoBERTa baseline, which is an important and honest outcome.
 
 The next steps are clear:
 
-1. Finish ISOT RoBERTa training and add ISOT results.
-2. Retrain the ensemble on real validation-set features.
-3. Expand the evidence base beyond the current 50-document prototype.
+1. Retrain the ensemble on real validation-set features.
+2. Expand the evidence base beyond the current 50-document prototype.
+3. Run cross-dataset experiments to test whether the very high ISOT
+   score reflects genuine generalization or dataset bias.
 4. Rerun full evaluation and ablation with the corrected reporting code.
 5. Add SHAP-based feature analysis and the planned human evaluation.
 

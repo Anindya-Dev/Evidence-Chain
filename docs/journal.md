@@ -22,12 +22,13 @@
 - LIAR preprocessing: complete
 - ISOT preprocessing: complete
 - LIAR RoBERTa baseline: complete
+- ISOT RoBERTa baseline: complete
 - FAISS knowledge base: complete as a prototype
 - Claim decomposition: complete
 - LLM reasoning: complete
 - Hallucination flagging: complete
 - Full LIAR pipeline: complete
-- ISOT RoBERTa training: running externally, not touched here
+- ISOT RoBERTa training: complete on Colab T4
 
 ### Current saved metrics
 
@@ -35,6 +36,12 @@
   - Accuracy: 0.6461
   - Weighted F1: 0.6443
   - Best epoch: 2
+
+- ISOT RoBERTa baseline:
+  - Accuracy: 0.999554565701559
+  - Weighted F1: 0.999554565701559
+  - Max length: 256
+  - Best checkpoint: epoch 1
 
 - Saved LIAR full-pipeline sample (50 claims):
   - Accuracy: 0.5000
@@ -57,22 +64,25 @@ At the same time, the current retrieval-plus-reasoning branch is not yet
 strong enough to beat the RoBERTa-only baseline. That is the main
 research bottleneck right now.
 
+The new ISOT baseline is extremely high. That is useful as a result, but
+it should be reported carefully because ISOT is likely much easier than
+LIAR under the current split and may contain strong source/style cues.
+
 ### Important current limitations
 
 1. The current knowledge base is small and document-level.
 2. The ensemble still needs training on real validation-set features.
-3. ISOT training is not finished yet, so cross-dataset claims must wait.
+3. Cross-dataset evaluation is still missing.
 4. Evaluation and ablation should be rerun after the latest reporting
    fixes.
 
 ### Next actions
 
-1. Wait for the ISOT model to finish training.
-2. Save the ISOT checkpoint and add ISOT baseline results.
-3. Train the ensemble on real validation-set features.
-4. Rerun full evaluation on LIAR with the corrected reporting code.
-5. Rerun ablation after ensemble retraining.
-6. Add SHAP analysis and human evaluation.
+1. Train the ensemble on real validation-set features.
+2. Rerun full evaluation on LIAR with the corrected reporting code.
+3. Rerun ablation after ensemble retraining.
+4. Run cross-dataset evaluation.
+5. Add SHAP analysis and human evaluation.
 
 ## Milestone Summary So Far
 
@@ -91,7 +101,7 @@ research bottleneck right now.
 ### Models
 
 - LIAR RoBERTa model trained and saved
-- ISOT RoBERTa training in progress
+- ISOT RoBERTa model trained and saved
 - Decomposition and reasoning modules connected
 
 ### Retrieval

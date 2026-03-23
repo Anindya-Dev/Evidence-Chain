@@ -13,18 +13,19 @@ Update this file whenever the code, results, or paper changes.
 
 ## Current Scope
 
-- Current reproducible system: LIAR-based EvidenceChain pipeline
+- Current reproducible system: LIAR-based EvidenceChain pipeline plus
+  LIAR and ISOT RoBERTa baselines
 - ISOT preprocessing: complete
-- ISOT RoBERTa training: running outside this workspace
-- Current paper state: draft completed for LIAR, pending ISOT update
+- ISOT RoBERTa training: complete
+- Current paper state: draft updated with LIAR and ISOT baseline results
 
 ## Core Choices
 
 | Area | Current choice | Why this choice | Current status |
 | --- | --- | --- | --- |
 | Main short-claim dataset | LIAR | Short political claims plus metadata make it useful for decomposition and claim verification | Complete |
-| Main long-article dataset | ISOT | Long articles test article-level language modeling and generalization | Preprocessed, model training pending |
-| Text classifier | `roberta-base` | Strong transformer baseline for binary classification | LIAR checkpoint saved |
+| Main long-article dataset | ISOT | Long articles test article-level language modeling and generalization | Baseline complete |
+| Text classifier | `roberta-base` | Strong transformer baseline for binary classification | LIAR and ISOT checkpoints saved |
 | Embedding model | `all-MiniLM-L6-v2` | Fast sentence embeddings for semantic retrieval | In use |
 | Vector store | FAISS `IndexFlatIP` | Simple and reliable cosine-similarity retrieval | In use |
 | Evidence sources | WHO, Reuters, Wikipedia | Mix of credibility and coverage for a prototype knowledge base | Current KB has 50 docs |
@@ -39,7 +40,7 @@ Update this file whenever the code, results, or paper changes.
 | --- | --- | --- | --- |
 | Data loading | `modules/data_loader.py` | Loads LIAR and ISOT from local files | Complete |
 | Preprocessing | `modules/preprocessor.py` | Cleans text and builds model inputs | Complete |
-| RoBERTa baseline | `modules/bert_classifier.py` | Trains and evaluates the text-only baseline | LIAR complete, ISOT pending |
+| RoBERTa baseline | `modules/bert_classifier.py` | Trains and evaluates the text-only baseline | LIAR and ISOT complete |
 | Knowledge base builder | `modules/knowldege_base_builder.py` | Builds the FAISS index and metadata | Prototype complete |
 | Retriever | `modules/retriever.py` | Retrieves weighted evidence | Complete |
 | Decomposer | `modules/decomposer.py` | Breaks claims into atomic sub-claims | Complete |
@@ -54,6 +55,7 @@ Update this file whenever the code, results, or paper changes.
 | Artifact | Meaning | Current value |
 | --- | --- | --- |
 | `results/tables/bert_results.csv` | Saved LIAR RoBERTa baseline | Accuracy 0.6461, weighted F1 0.6443 |
+| `results/tables/bert_results_isot.csv` | Saved ISOT RoBERTa baseline | Accuracy 0.9996, weighted F1 0.9996 |
 | `results/tables/full_evaluation.json` | Saved 50-claim LIAR pipeline sample | Accuracy 0.5000, weighted F1 0.4833, ROC-AUC 0.6208, HR 0.46 |
 | `results/tables/ablation_results.csv` | Saved 30-claim LIAR ablation sample | BERT-only currently beats full pipeline |
 | `results/pipeline_test.json` | Qualitative sample outputs | 3 handpicked claims |
@@ -63,17 +65,17 @@ Update this file whenever the code, results, or paper changes.
 1. The current knowledge base is still small. It contains 50 documents.
 2. The saved index is document-level, not chunk-level.
 3. The ensemble still needs training on real validation-set features.
-4. ISOT results are intentionally not finalized here because training is
-   still running externally.
+4. The ISOT score is extremely high and should be interpreted with care,
+   because the dataset is likely easier and more source-biased than
+   LIAR.
 
-## Next Actions After ISOT Training Finishes
+## Next Actions
 
-1. Save the ISOT checkpoint into `results/models/roberta_isot`.
-2. Export ISOT baseline metrics into `results/tables/bert_results_isot.csv`.
-3. Add ISOT and cross-dataset tables to `docs/paper.md`.
-4. Train the ensemble on real validation features.
-5. Rerun full evaluation and ablation with the corrected code.
-6. Add SHAP analysis and human evaluation outputs.
+1. Train the ensemble on real validation features.
+2. Add ISOT and cross-dataset tables to `docs/paper.md`.
+3. Rerun full evaluation and ablation with the corrected code.
+4. Add SHAP analysis and human evaluation outputs.
+5. Run cross-dataset experiments to test generalization.
 
 ## Documentation Rules
 
