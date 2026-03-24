@@ -18,6 +18,7 @@ RESULTS_DIR     = os.path.join(BASE_DIR, "results")
 PLOTS_DIR       = os.path.join(BASE_DIR, "results", "plots")
 TABLES_DIR      = os.path.join(BASE_DIR, "results", "tables")
 MODELS_DIR      = os.path.join(BASE_DIR, "results", "models")
+CACHE_DIR       = os.path.join(BASE_DIR, "results", "cache")
 
 # ── Reproducibility ────────────────────────────────────────────────────
 RANDOM_SEED = 42
@@ -105,6 +106,9 @@ LLM_MODEL       = os.getenv(
 )
 LLM_TEMPERATURE = 0.0
 LLM_MAX_TOKENS  = 1000
+LLM_RATE_LIMIT_RPM = int(os.getenv("LLM_RATE_LIMIT_RPM", "30"))
+LLM_MAX_RETRIES    = int(os.getenv("LLM_MAX_RETRIES", "6"))
+LLM_RETRY_BASE_SEC = float(os.getenv("LLM_RETRY_BASE_SEC", "2.0"))
 
 # ── Dataset Selection ──────────────────────────────────────────────────
 # Switch between LIAR and ISOT training
