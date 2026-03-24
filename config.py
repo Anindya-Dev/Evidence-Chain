@@ -4,6 +4,9 @@
 # This ensures reproducibility — a core requirement of research.
 
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # ── Paths ──────────────────────────────────────────────────────────────
 BASE_DIR        = os.path.dirname(os.path.abspath(__file__))
@@ -94,10 +97,12 @@ HALLUCINATION_SIM_THRESHOLD  = 0.45
 HALLUCINATION_CONF_THRESHOLD = 0.75
 
 # ── LLM Settings ──────────────────────────────────────────────────────
-# Groq provides free API access to llama3
 # Temperature 0.0 = deterministic = reproducible research results
-LLM_PROVIDER    = "groq"
-LLM_MODEL       = "llama-3.3-70b-versatile"
+LLM_PROVIDER    = os.getenv("LLM_PROVIDER", "groq")
+LLM_MODEL       = os.getenv(
+    "LLM_MODEL",
+    "gemini-2.5-flash" if LLM_PROVIDER.lower() == "gemini" else "llama-3.3-70b-versatile"
+)
 LLM_TEMPERATURE = 0.0
 LLM_MAX_TOKENS  = 1000
 

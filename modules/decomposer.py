@@ -12,11 +12,11 @@
 import os
 import sys
 import json
-from groq import Groq
 from dotenv import load_dotenv
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import config
+from modules.llm_client import LLMClient
 
 load_dotenv()
 
@@ -35,7 +35,7 @@ class ClaimDecomposer:
     """
 
     def __init__(self):
-        self.client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+        self.client = LLMClient()
 
     def decompose(self, claim):
         """
@@ -62,17 +62,10 @@ Rules:
 
 Claim: "{claim}"
 
-Return format: ["sub-claim 1", "sub-claim 2", ...]"""
+        Return format: ["sub-claim 1", "sub-claim 2", ...]"""
 
         try:
-            response = self.client.chat.completions.create(
-                model       = config.LLM_MODEL,
-                messages    = [{"role": "user", "content": prompt}],
-                temperature = config.LLM_TEMPERATURE,
-                max_tokens  = config.LLM_MAX_TOKENS
-            )
-
-            raw = response.choices[0].message.content.strip()
+            raw = self.client.generate_json_text(prompt)
 
             # Parse JSON response
             # Why JSON? Structured output is parseable — no regex needed

@@ -12,11 +12,11 @@
 import os
 import sys
 import json
-from groq import Groq
 from dotenv import load_dotenv
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import config
+from modules.llm_client import LLMClient
 
 load_dotenv()
 
@@ -31,7 +31,7 @@ class EvidenceReasoner:
     """
 
     def __init__(self):
-        self.client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+        self.client = LLMClient()
 
     def reason(self, sub_claim, evidence_list):
         """
@@ -81,14 +81,7 @@ Rules:
 - confidence reflects how strongly the evidence supports your verdict"""
 
         try:
-            response = self.client.chat.completions.create(
-                model       = config.LLM_MODEL,
-                messages    = [{"role": "user", "content": prompt}],
-                temperature = config.LLM_TEMPERATURE,
-                max_tokens  = config.LLM_MAX_TOKENS
-            )
-
-            raw    = response.choices[0].message.content.strip()
+            raw    = self.client.generate_json_text(prompt)
             result = json.loads(raw)
 
             # Validate required fields
