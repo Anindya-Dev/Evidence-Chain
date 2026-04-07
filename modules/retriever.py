@@ -7,6 +7,7 @@ import sys
 import pickle
 import numpy as np
 import faiss
+import torch
 from sentence_transformers import SentenceTransformer
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -24,17 +25,23 @@ class Retriever:
 
         # Load embedding model — same one used to build the index
         # Must be identical — different model = incompatible vectors
-        self.embedder = SentenceTransformer(config.EMBEDDING_MODEL)
+        self.embedder = SentenceTransformer(
+            config.EMBEDDING_MODEL,
+            device="cuda" if torch.cuda.is_available() else "cpu"
+        )
+
+        kb_dir = config.get_knowledge_base_dir()
 
         # Load FAISS index from disk
-        index_path    = os.path.join(config.KNOWLEDGE_BASE, "faiss_index.bin")
+        index_path    = os.path.join(kb_dir, "faiss_index.bin")
         self.index    = faiss.read_index(index_path)
 
         # Load metadata — source, date, weights for each document
-        meta_path     = os.path.join(config.KNOWLEDGE_BASE, "metadata.pkl")
+        meta_path     = os.path.join(kb_dir, "metadata.pkl")
         with open(meta_path, "rb") as f:
             self.metadata = pickle.load(f)
 
+        print(f"  Knowledge base : {kb_dir}")
         print(f"  Index loaded  : {self.index.ntotal} vectors")
         print(f"  Metadata      : {len(self.metadata)} documents")
 

@@ -12,7 +12,11 @@ from transformers import RobertaTokenizer, RobertaForSequenceClassification
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from modules.preprocessor import preprocess_text
+from modules.preprocessor import (
+    preprocess_text,
+    build_model_input,
+    extract_claim_text,
+)
 from modules.decomposer   import ClaimDecomposer
 from modules.retriever    import Retriever
 from modules.reasoner     import EvidenceReasoner
@@ -21,18 +25,9 @@ import config
 
 
 def _resolve_roberta_model_dir():
-    """
-    Prefer the dataset-specific RoBERTa checkpoint when it exists.
-    Fall back to the LIAR checkpoint so the pipeline remains usable
-    while ISOT training is still in progress.
-    """
+    """Returns the best available RoBERTa checkpoint for the active dataset."""
 
-    preferred = os.path.join(config.MODELS_DIR, f"roberta_{config.DATASET}")
-    if os.path.isdir(preferred):
-        return preferred
-
-    fallback = os.path.join(config.MODELS_DIR, "roberta_liar")
-    return fallback
+    return config.get_roberta_model_dir()
 
 
 class EvidenceChain:
@@ -50,6 +45,11 @@ class EvidenceChain:
             "cuda" if torch.cuda.is_available() else "cpu"
         )
         print(f"Device: {self.device}")
+        if config.CHEAP_MODE:
+            print(
+                f"Cheap mode enabled: max {config.CHEAP_MAX_SUBCLAIMS} "
+                f"sub-claims per example"
+            )
 
         # Load all modules
         self.decomposer = ClaimDecomposer()
@@ -73,7 +73,7 @@ class EvidenceChain:
         print("-" * 50)
         print("EvidenceChain ready\n")
 
-    def get_bert_probability(self, claim):
+    def get_bert_probability(self, example):
         """
         Gets BERT probability of REAL class for a claim.
         
@@ -81,12 +81,11 @@ class EvidenceChain:
             float — probability of REAL (0 to 1)
         """
 
-        # Preprocess
-        clean = preprocess_text(claim)
+        model_input = build_model_input(example)
 
         # Tokenize
         encoding = self.tokenizer(
-            clean,
+            model_input,
             max_length     = config.BERT_MAX_LENGTH,
             truncation     = True,
             padding        = "max_length",
@@ -109,16 +108,18 @@ class EvidenceChain:
 
         return real_prob
 
-    def verify(self, claim):
+    def verify(self, claim_input):
         """
         Full verification pipeline for a single claim.
         
         Args:
-            claim : raw claim string
+            claim_input : raw claim string or structured example
             
         Returns:
             dict with complete verdict and explanation
         """
+
+        claim = extract_claim_text(claim_input)
 
         print(f"\n{'='*60}")
         print(f"CLAIM: {claim}")
@@ -131,6 +132,12 @@ class EvidenceChain:
         # ── Step 2: Decompose ──────────────────────────────────
         print(f"\n[2] Decomposing claim...")
         sub_claims = self.decomposer.decompose(clean_claim)
+        if config.CHEAP_MODE and len(sub_claims) > config.CHEAP_MAX_SUBCLAIMS:
+            print(
+                f"    Cheap mode: truncating sub-claims from {len(sub_claims)} "
+                f"to {config.CHEAP_MAX_SUBCLAIMS}"
+            )
+            sub_claims = sub_claims[:config.CHEAP_MAX_SUBCLAIMS]
         print(f"    Sub-claims ({len(sub_claims)}):")
         for i, sc in enumerate(sub_claims):
             print(f"    {i+1}. {sc}")
@@ -183,7 +190,7 @@ class EvidenceChain:
         print(f"    Hallucinated          : {rag_result['hallucination_flag']}")
 
         # ── Step 5: BERT probability ───────────────────────────
-        bert_prob = self.get_bert_probability(claim)
+        bert_prob = self.get_bert_probability(claim_input)
         print(f"\n[5] BERT probability (REAL): {bert_prob:.4f}")
 
         # ── Step 6: Stacking Ensemble ──────────────────────────

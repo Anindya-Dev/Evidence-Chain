@@ -1,0 +1,373 @@
+{
+  "metrics": {
+    "accuracy": 1.0,
+    "f1": 1.0,
+    "precision": 1.0,
+    "recall": 1.0,
+    "roc_auc": 1.0,
+    "hallucination_rate": 0.06,
+    "evidence_recall": 0.92,
+    "n_evaluated": 50
+  },
+  "results": [
+    {
+      "claim": "trumps major meeting on veterans affairs never took place but he did play golf",
+      "sub_claims": [
+        "Trumps major meeting on veterans affairs never took place",
+        "He did play golf"
+      ],
+      "rag_verdict": "UNVERIFIABLE",
+      "rag_confidence": 0.725,
+      "rag_max_similarity": 0.4872,
+      "rag_source_weight_avg": 0.9,
+      "bert_prob": 0.0,
+      "final_verdict": "FAKE",
+      "confidence": 0.9759,
+      "hallucinated": true,
+      "sub_results": [
+        {
+          "sub_claim": "Trumps major meeting on veterans affairs never took place",
+          "verdict": "UNVERIFIABLE",
+          "confidence": 0.5,
+          "reasoning": "The provided evidence does not mention any meeting on veterans affairs, so it neither supports nor contradicts the claim.",
+          "max_similarity": 0.5398,
+          "source_weight_avg": 0.9,
+          "hallucination_flag": false,
+          "evidence_count": 5
+        },
+        {
+          "sub_claim": "He did play golf",
+          "verdict": "TRUE",
+          "confidence": 0.95,
+          "reasoning": "Multiple sources from Reuters indicate that Donald Trump frequently engaged in golf-related activities, including hosting other leaders and making public statements about his golf clubs.",
+          "max_similarity": 0.4347,
+          "source_weight_avg": 0.9,
+          "hallucination_flag": true,
+          "evidence_count": 5
+        }
+      ]
+    },
+    {
+      "claim": "ukraine expels another russian journalist over coverage",
+      "sub_claims": [
+        "Ukraine expels a Russian journalist",
+        "The expulsion is related to the journalist's coverage"
+      ],
+      "rag_verdict": "UNVERIFIABLE",
+      "rag_confidence": 0.5,
+      "rag_max_similarity": 0.5492,
+      "rag_source_weight_avg": 0.9,
+      "bert_prob": 1.0,
+      "final_verdict": "REAL",
+      "confidence": 0.9532,
+      "hallucinated": false,
+      "sub_results": [
+        {
+          "sub_claim": "Ukraine expels a Russian journalist",
+          "verdict": "UNVERIFIABLE",
+          "confidence": 0.5,
+          "reasoning": "None of the provided evidence mentions any expulsions or actions taken against Russian journalists by Ukraine.",
+          "max_similarity": 0.5879,
+          "source_weight_avg": 0.9,
+          "hallucination_flag": false,
+          "evidence_count": 5
+        },
+        {
+          "sub_claim": "The expulsion is related to the journalist's coverage",
+          "verdict": "UNVERIFIABLE",
+          "confidence": 0.5,
+          "reasoning": "The provided evidence does not contain any information related to a journalist's coverage or expulsion.",
+          "max_similarity": 0.5105,
+          "source_weight_avg": 0.9,
+          "hallucination_flag": false,
+          "evidence_count": 5
+        }
+      ]
+    },
+    {
+      "claim": "senate approves measure to kill obamaera contractor rule",
+      "sub_claims": [
+        "Senate approves measure",
+        "Measure aims to kill Obama-era contractor rule"
+      ],
+      "rag_verdict": "FALSE",
+      "rag_confidence": 0.85,
+      "rag_max_similarity": 0.551,
+      "rag_source_weight_avg": 0.9,
+      "bert_prob": 1.0,
+      "final_verdict": "REAL",
+      "confidence": 0.9537,
+      "hallucinated": false,
+      "sub_results": [
+        {
+          "sub_claim": "Senate approves measure",
+          "verdict": "TRUE",
+          "confidence": 0.9,
+          "reasoning": "Multiple sources indicate that Senate Republicans have enough votes to pass a budget measure, which is crucial for tax reform legislation.",
+          "max_similarity": 0.5435,
+          "source_weight_avg": 0.9,
+          "hallucination_flag": false,
+          "evidence_count": 5
+        },
+        {
+          "sub_claim": "Measure aims to kill Obama-era contractor rule",
+          "verdict": "FALSE",
+          "confidence": 0.85,
+          "reasoning": "The evidence shows efforts to kill Obama-era regulations, but does not specifically mention a measure aimed at killing a contractor rule.",
+          "max_similarity": 0.5584,
+          "source_weight_avg": 0.9,
+          "hallucination_flag": false,
+          "evidence_count": 5
+        }
+      ]
+    },
+    {
+      "claim": "hedge fund executive scaramucci lands post at exportimport bank source",
+      "sub_claims": [
+        "hedge fund executive Scaramucci lands post",
+        "at export-import bank"
+      ],
+      "rag_verdict": "FALSE",
+      "rag_confidence": 0.85,
+      "rag_max_similarity": 0.573,
+      "rag_source_weight_avg": 0.9,
+      "bert_prob": 1.0,
+      "final_verdict": "REAL",
+      "confidence": 0.9592,
+      "hallucinated": false,
+      "sub_results": [
+        {
+          "sub_claim": "hedge fund executive Scaramucci lands post",
+          "verdict": "TRUE",
+          "confidence": 0.95,
+          "reasoning": "Multiple sources confirm that Anthony Scaramucci, a hedge fund executive, has been appointed to various roles in President Trump's administration.",
+          "max_similarity": 0.5712,
+          "source_weight_avg": 0.9,
+          "hallucination_flag": false,
+          "evidence_count": 5
+        },
+        {
+          "sub_claim": "at export-import bank",
+          "verdict": "FALSE",
+          "confidence": 0.85,
+          "reasoning": "The evidence discusses Scott Garrett's nomination to head the Export-Import Bank, but does not mention 'at export-import bank'.",
+          "max_similarity": 0.5748,
+          "source_weight_avg": 0.9,
+          "hallucination_flag": false,
+          "evidence_count": 5
+        }
+      ]
+    },
+    {
+      "claim": "trump vows to get better deal for us on keystone xl promises to break the law to do it",
+      "sub_claims": [
+        "Trump vows to get better deal for US on Keystone XL",
+        "Trump promises to break the law to do it"
+      ],
+      "rag_verdict": "FALSE",
+      "rag_confidence": 0.85,
+      "rag_max_similarity": 0.6144,
+      "rag_source_weight_avg": 0.9,
+      "bert_prob": 0.0,
+      "final_verdict": "FAKE",
+      "confidence": 0.9496,
+      "hallucinated": false,
+      "sub_results": [
+        {
+          "sub_claim": "Trump vows to get better deal for US on Keystone XL",
+          "verdict": "FALSE",
+          "confidence": 0.85,
+          "reasoning": "The provided evidence only discusses Trump's approval of the Keystone XL pipeline and does not mention any vow to get a better deal for the US.",
+          "max_similarity": 0.691,
+          "source_weight_avg": 0.9,
+          "hallucination_flag": false,
+          "evidence_count": 5
+        },
+        {
+          "sub_claim": "Trump promises to break the law to do it",
+          "verdict": "UNVERIFIABLE",
+          "confidence": 0.5,
+          "reasoning": "The provided evidence does not contain any information about Trump promising to break the law.",
+          "max_similarity": 0.5378,
+          "source_weight_avg": 0.9,
+          "hallucination_flag": false,
+          "evidence_count": 5
+        }
+      ]
+    },
+    {
+      "claim": "insurers step up pitch for obamacare as government slashes its effort",
+      "sub_claims": [
+        "insurers step up pitch for obamacare",
+        "government slashes its effort"
+      ],
+      "rag_verdict": "UNVERIFIABLE",
+      "rag_confidence": 0.675,
+      "rag_max_similarity": 0.5553,
+      "rag_source_weight_avg": 0.9,
+      "bert_prob": 1.0,
+      "final_verdict": "REAL",
+      "confidence": 0.9548,
+      "hallucinated": false,
+      "sub_results": [
+        {
+          "sub_claim": "insurers step up pitch for obamacare",
+          "verdict": "TRUE",
+          "confidence": 0.85,
+          "reasoning": "The evidence shows that President Obama urged insurers to step up efforts to enroll younger and healthier Americans, supporting the claim.",
+          "max_similarity": 0.6858,
+          "source_weight_avg": 0.9,
+          "hallucination_flag": false,
+          "evidence_count": 5
+        },
+        {
+          "sub_claim": "government slashes its effort",
+          "verdict": "UNVERIFIABLE",
+          "confidence": 0.5,
+          "reasoning": "The provided evidence does not mention any government's effort being slashed, making it unverifiable with the given information.",
+          "max_similarity": 0.4248,
+          "source_weight_avg": 0.9,
+          "hallucination_flag": false,
+          "evidence_count": 5
+        }
+      ]
+    },
+    {
+      "claim": "philippine congress backs body cameras for police in bloody war on drugs",
+      "sub_claims": [
+        "philippine congress backs body cameras for police",
+        "there is a bloody war on drugs"
+      ],
+      "rag_verdict": "UNVERIFIABLE",
+      "rag_confidence": 0.675,
+      "rag_max_similarity": 0.5368,
+      "rag_source_weight_avg": 0.9,
+      "bert_prob": 1.0,
+      "final_verdict": "REAL",
+      "confidence": 0.9497,
+      "hallucinated": false,
+      "sub_results": [
+        {
+          "sub_claim": "philippine congress backs body cameras for police",
+          "verdict": "UNVERIFIABLE",
+          "confidence": 0.5,
+          "reasoning": "The provided evidence does not mention the Philippine Congress or body cameras for police.",
+          "max_similarity": 0.5495,
+          "source_weight_avg": 0.9,
+          "hallucination_flag": false,
+          "evidence_count": 5
+        },
+        {
+          "sub_claim": "there is a bloody war on drugs",
+          "verdict": "TRUE",
+          "confidence": 0.85,
+          "reasoning": "The evidence shows that there have been thousands of deaths during Duterte's drug war, indicating a bloody conflict.",
+          "max_similarity": 0.5241,
+          "source_weight_avg": 0.9,
+          "hallucination_flag": false,
+          "evidence_count": 5
+        }
+      ]
+    },
+    {
+      "claim": "panama papers show donald trumps name mentioned over 3500 times",
+      "sub_claims": [
+        "Donald Trump's name is mentioned over 3500 times in the Panama Papers"
+      ],
+      "rag_verdict": "UNVERIFIABLE",
+      "rag_confidence": 0.0,
+      "rag_max_similarity": 0.5153,
+      "rag_source_weight_avg": 0.9,
+      "bert_prob": 0.0,
+      "final_verdict": "FAKE",
+      "confidence": 0.9716,
+      "hallucinated": false,
+      "sub_results": [
+        {
+          "sub_claim": "Donald Trump's name is mentioned over 3500 times in the Panama Papers",
+          "verdict": "UNVERIFIABLE",
+          "confidence": 0.0,
+          "reasoning": "The provided evidence does not contain any information about Donald Trump's name being mentioned in the Panama Papers.",
+          "max_similarity": 0.5153,
+          "source_weight_avg": 0.9,
+          "hallucination_flag": false,
+          "evidence_count": 5
+        }
+      ]
+    },
+    {
+      "claim": "senators call for probe of cyber attacks by russia",
+      "sub_claims": [
+        "Senators call for probe",
+        "Probe relates to cyber attacks"
+      ],
+      "rag_verdict": "TRUE",
+      "rag_confidence": 0.925,
+      "rag_max_similarity": 0.5998,
+      "rag_source_weight_avg": 0.9,
+      "bert_prob": 1.0,
+      "final_verdict": "REAL",
+      "confidence": 0.9651,
+      "hallucinated": false,
+      "sub_results": [
+        {
+          "sub_claim": "Senators call for probe",
+          "verdict": "TRUE",
+          "confidence": 0.95,
+          "reasoning": "Multiple sources from Reuters report that senators are calling for or planning to conduct probes into Russian activities and their potential connections with Trump's campaign.",
+          "max_similarity": 0.6422,
+          "source_weight_avg": 0.9,
+          "hallucination_flag": false,
+          "evidence_count": 5
+        },
+        {
+          "sub_claim": "Probe relates to cyber attacks",
+          "verdict": "TRUE",
+          "confidence": 0.9,
+          "reasoning": "The evidence provides multiple instances of cyber attacks being discussed and highlighted as significant threats, supporting the claim.",
+          "max_similarity": 0.5573,
+          "source_weight_avg": 0.9,
+          "hallucination_flag": false,
+          "evidence_count": 5
+        }
+      ]
+    },
+    {
+      "claim": "viral video update marine vet has to be evacuated from iraq after telling truth about islam it wasnt safe for me to remain in the location i was in video",
+      "sub_claims": [
+        "A viral video features a marine veteran",
+        "The marine veteran had to be evacuated from Iraq"
+      ],
+      "rag_verdict": "UNVERIFIABLE",
+      "rag_confidence": 0.5,
+      "rag_max_similarity": 0.4566,
+      "rag_source_weight_avg": 0.9,
+      "bert_prob": 0.0,
+      "final_verdict": "FAKE",
+      "confidence": 0.9799,
+      "hallucinated": false,
+      "sub_results": [
+        {
+          "sub_claim": "A viral video features a marine veteran",
+          "verdict": "UNVERIFIABLE",
+          "confidence": 0.5,
+          "reasoning": "The provided evidence does not mention any viral video featuring a marine veteran.",
+          "max_similarity": 0.4736,
+          "source_weight_avg": 0.9,
+          "hallucination_flag": false,
+          "evidence_count": 5
+        },
+        {
+          "sub_claim": "The marine veteran had to be evacuated from Iraq",
+          "verdict": "UNVERIFIABLE",
+          "confidence": 0.5,
+          "reasoning": "None of the provided evidence mentions a marine veteran being evacuated from Iraq.",
+          "max_similarity": 0.4395,
+          "source_weight_avg": 0.9,
+          "hallucination_flag": false,
+          "evidence_count": 5
+        }
+      ]
+    }
+  ]
+}

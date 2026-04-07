@@ -11,6 +11,145 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import config
 
 
+def _is_missing(value):
+    """Returns True for None, NaN, or blank strings."""
+
+    if value is None:
+        return True
+    if isinstance(value, str):
+        return value.strip() == ""
+    try:
+        return bool(pd.isna(value))
+    except Exception:
+        return False
+
+
+def _get_value(example, key, default=None):
+    """Best-effort field access for dicts, pandas rows, and similar objects."""
+
+    if hasattr(example, "get"):
+        value = example.get(key, default)
+    else:
+        try:
+            value = example[key]
+        except Exception:
+            value = default
+
+    return default if _is_missing(value) else value
+
+
+def build_liar_combined_text(statement, speaker="unknown", subject="unknown"):
+    """
+    Builds the LIAR classifier input format used during preprocessing.
+
+    This intentionally mirrors the original training representation so
+    saved LIAR checkpoints continue to see the same token structure.
+    """
+
+    clean_statement = preprocess_text(statement)
+    speaker_text = str(speaker) if not _is_missing(speaker) else "unknown"
+    subject_text = str(subject) if not _is_missing(subject) else "unknown"
+
+    return (
+        "[CLAIM] "    + clean_statement +
+        " [SPEAKER] " + speaker_text +
+        " [SUBJECT] " + subject_text
+    )
+
+
+def build_isot_combined_text(title="", body=""):
+    """
+    Builds the ISOT classifier input format used during preprocessing.
+
+    The body is truncated to the first 400 words before cleaning so
+    runtime inference matches the saved training data format.
+    """
+
+    title_clean = preprocess_text("" if _is_missing(title) else title)
+    body_words = str("" if _is_missing(body) else body).split()[:400]
+    body_clean = preprocess_text(" ".join(body_words))
+
+    return (
+        "[TITLE] " + title_clean +
+        " [BODY] "  + body_clean
+    )
+
+
+def build_model_input(example, dataset=None):
+    """
+    Returns the classifier input text for a raw string or record.
+
+    Records prefer their precomputed ``combined_text`` so runtime can
+    exactly reuse the training representation when metadata is available.
+    """
+
+    dataset = (dataset or config.DATASET).lower()
+
+    if isinstance(example, str):
+        if dataset == "liar":
+            if "[CLAIM]" in example and "[SPEAKER]" in example:
+                return example
+            return build_liar_combined_text(example)
+
+        if "[TITLE]" in example and "[BODY]" in example:
+            return example
+        return build_isot_combined_text(body=example)
+
+    combined_text = _get_value(example, "combined_text")
+    if not _is_missing(combined_text):
+        return str(combined_text)
+
+    if dataset == "liar":
+        return build_liar_combined_text(
+            _get_value(example, "statement", _get_value(example, "claim", "")),
+            speaker=_get_value(example, "speaker", "unknown"),
+            subject=_get_value(example, "subject", "unknown")
+        )
+
+    return build_isot_combined_text(
+        title=_get_value(example, "title", ""),
+        body=_get_value(
+            example,
+            "text_truncated",
+            _get_value(
+                example,
+                "text",
+                _get_value(example, "claim", _get_value(example, "statement", ""))
+            )
+        )
+    )
+
+
+def extract_claim_text(example, dataset=None):
+    """
+    Returns the text the verification pipeline should reason over.
+
+    For LIAR this is the claim statement. For ISOT this prefers the
+    article title so the decomposition/RAG branch operates on a concise
+    claim-like string instead of a full article body.
+    """
+
+    dataset = (dataset or config.DATASET).lower()
+
+    if isinstance(example, str):
+        return example
+
+    if dataset == "liar":
+        return str(_get_value(example, "statement", _get_value(example, "claim", "")))
+
+    return str(
+        _get_value(
+            example,
+            "title",
+            _get_value(
+                example,
+                "claim",
+                _get_value(example, "statement", _get_value(example, "combined_text", ""))
+            )
+        )
+    )
+
+
 def preprocess_text(text):
     """
     Cleans a single text string through 5 sequential steps.
@@ -57,10 +196,13 @@ def preprocess_dataframe(df):
     df["clean_statement"] = df["statement"].apply(preprocess_text)
 
     # Build structured combined text
-    df["combined_text"] = (
-        "[CLAIM] "    + df["clean_statement"] +
-        " [SPEAKER] " + df["speaker"] +
-        " [SUBJECT] " + df["subject"]
+    df["combined_text"] = df.apply(
+        lambda row: build_liar_combined_text(
+            row["statement"],
+            speaker=row["speaker"],
+            subject=row["subject"]
+        ),
+        axis=1
     )
 
     # Map 6-class to binary
@@ -94,9 +236,12 @@ def preprocess_isot_dataframe(df):
 
     # Build combined text — title carries strong signal in ISOT
     # Sensational titles vs neutral Reuters titles
-    df["combined_text"] = (
-        "[TITLE] " + df["title"] +
-        " [BODY] "  + df["text_truncated"]
+    df["combined_text"] = df.apply(
+        lambda row: build_isot_combined_text(
+            title=row["title"],
+            body=row["text_truncated"]
+        ),
+        axis=1
     )
 
     return df

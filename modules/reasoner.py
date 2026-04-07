@@ -128,12 +128,25 @@ Rules:
 
         lines = []
         for i, e in enumerate(evidence_list):
+            text = self._truncate_evidence_text(e["text"])
             lines.append(
                 f"[{i+1}] Source: {e['source'].upper()} "
                 f"(credibility: {e['source_weight']})\n"
-                f"    {e['text']}"
+                f"    {text}"
             )
         return "\n\n".join(lines)
+
+    def _truncate_evidence_text(self, text, max_words=120):
+        """
+        Keeps only the most useful evidence span in the prompt.
+
+        Large Reuters documents make local LLM prompts slow and brittle.
+        Truncating each retrieved snippet keeps grounding signal while
+        making local reasoning much more reliable on commodity hardware.
+        """
+
+        words = str(text).split()
+        return " ".join(words[:max_words])
 
     def _check_hallucination(self, confidence, similarity):
         """

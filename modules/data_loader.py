@@ -11,6 +11,7 @@ import os
 import sys
 import pandas as pd
 from dotenv import load_dotenv
+from sklearn.model_selection import train_test_split
 
 # Add root folder to path so we can import config
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -183,15 +184,28 @@ def load_isot():
     print(f"  Fake news   : {len(fake_df)}")
     print(f"  Columns     : {list(df.columns)}")
 
-    # Split into train/val/test using same ratios as LIAR
-    # Why same ratios? Consistent experimental setup for paper
-    n          = len(df)
-    train_end  = int(n * config.TRAIN_RATIO)
-    val_end    = int(n * (config.TRAIN_RATIO + config.VAL_RATIO))
+    # Split with stratification so class balance stays stable across
+    # train/validation/test rather than relying on one random shuffle.
+    train_val_df, test_df = train_test_split(
+        df,
+        test_size=config.TEST_RATIO,
+        stratify=df["binary_label"],
+        random_state=config.RANDOM_SEED
+    )
 
-    train_df = df.iloc[:train_end].reset_index(drop=True)
-    val_df   = df.iloc[train_end:val_end].reset_index(drop=True)
-    test_df  = df.iloc[val_end:].reset_index(drop=True)
+    val_ratio_within_train_val = config.VAL_RATIO / (
+        config.TRAIN_RATIO + config.VAL_RATIO
+    )
+    train_df, val_df = train_test_split(
+        train_val_df,
+        test_size=val_ratio_within_train_val,
+        stratify=train_val_df["binary_label"],
+        random_state=config.RANDOM_SEED
+    )
+
+    train_df = train_df.reset_index(drop=True)
+    val_df = val_df.reset_index(drop=True)
+    test_df = test_df.reset_index(drop=True)
 
     print(f"\n  Train : {len(train_df)}")
     print(f"  Val   : {len(val_df)}")

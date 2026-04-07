@@ -44,16 +44,10 @@ def load_processed_data():
     Switch between liar and isot in config.py — no code change needed.
     """
 
-    if config.DATASET == "isot":
-        train_df = pd.read_csv(os.path.join(config.DATA_PROCESSED, "isot_train.csv"))
-        val_df   = pd.read_csv(os.path.join(config.DATA_PROCESSED, "isot_val.csv"))
-        test_df  = pd.read_csv(os.path.join(config.DATA_PROCESSED, "isot_test.csv"))
-        print(f"Dataset: ISOT")
-    else:
-        train_df = pd.read_csv(os.path.join(config.DATA_PROCESSED, "train.csv"))
-        val_df   = pd.read_csv(os.path.join(config.DATA_PROCESSED, "val.csv"))
-        test_df  = pd.read_csv(os.path.join(config.DATA_PROCESSED, "test.csv"))
-        print(f"Dataset: LIAR")
+    train_df = pd.read_csv(config.get_processed_split_path("train"))
+    val_df   = pd.read_csv(config.get_processed_split_path("val"))
+    test_df  = pd.read_csv(config.get_processed_split_path("test"))
+    print(f"Dataset: {config.DATASET.upper()}")
 
     train_df = train_df.dropna(subset=["binary_label", "combined_text"])
     val_df   = val_df.dropna(subset=["binary_label", "combined_text"])
@@ -235,12 +229,16 @@ if __name__ == "__main__":
 
     os.makedirs(config.TABLES_DIR, exist_ok=True)
     results = {
-        "dataset"   : config.DATASET,
-        "model"     : config.BERT_MODEL_NAME,
-        "accuracy"  : round(test_acc, 4),
-        "f1_score"  : round(test_f1, 4),
-        "epochs"    : config.BERT_EPOCHS,
-        "best_epoch": best_epoch
+        "dataset"           : config.DATASET,
+        "benchmark_profile" : config.get_benchmark_profile(),
+        "model"             : config.BERT_MODEL_NAME,
+        "accuracy"          : round(test_acc, 4),
+        "f1_score"          : round(test_f1, 4),
+        "epochs"            : config.BERT_EPOCHS,
+        "best_epoch"        : best_epoch,
+        "train_examples"    : len(train_df),
+        "val_examples"      : len(val_df),
+        "test_examples"     : len(test_df),
     }
     pd.DataFrame([results]).to_csv(
         os.path.join(config.TABLES_DIR, f"bert_results_{config.DATASET}.csv"),

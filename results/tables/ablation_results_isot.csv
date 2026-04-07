@@ -1,0 +1,7 @@
+configuration,accuracy,f1,hallucination_rate
+Full EvidenceChain,1.0,1.0,0.08
+No Decomposition,1.0,1.0,0.02
+No Weighting (C2),1.0,1.0,0.08
+No Hallucination Det. (C3),1.0,1.0,0.0
+BERT Only,1.0,1.0,0.0
+RAG Only,0.61,0.5298,0.08

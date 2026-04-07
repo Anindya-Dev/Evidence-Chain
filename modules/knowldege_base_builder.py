@@ -11,6 +11,7 @@ import sys
 import pickle
 import time
 import numpy as np
+import pandas as pd
 from datetime import datetime, timezone
 from sentence_transformers import SentenceTransformer
 import faiss
@@ -180,9 +181,13 @@ def fetch_wikipedia_docs():
                 continue
 
             documents.append({
-                "text"  : summary,
-                "source": "wikipedia",
-                "date"  : "2024-01-01"
+                "text"        : summary,
+                "source"      : "wikipedia",
+                "date"        : "2024-01-01",
+                "origin_split": "external",
+                "origin_dataset": "wikipedia",
+                "is_external" : True,
+                "kb_profile"  : "external_reference"
             })
             print(f"  ✓ {page.title}")
             time.sleep(0.3)
@@ -214,13 +219,106 @@ def compute_recency_weight(date_str):
         return 0.0
 
 
+def _truncate_words(text, max_words=300):
+    """Returns the first ``max_words`` words of a text string."""
+
+    words = str(text).split()
+    return " ".join(words[:max_words])
+
+
+def _parse_isot_date(date_value):
+    """
+    Converts ISOT date strings like 'January 26, 2016 ' to ISO format.
+    Falls back to an empty string when parsing fails.
+    """
+
+    raw = str(date_value or "").strip()
+    if not raw:
+        return ""
+
+    for fmt in ("%B %d, %Y", "%b %d, %Y"):
+        try:
+            return datetime.strptime(raw, fmt).strftime("%Y-%m-%d")
+        except ValueError:
+            continue
+
+    return ""
+
+
+def load_isot_trusted_documents(max_articles=None):
+    """
+    Builds a trusted ISOT corpus from Reuters articles in the train split.
+
+    Why train split only?
+    It gives the retriever broad coverage while avoiding direct leakage
+    from validation/test rows into the evidence store.
+    """
+
+    path = config.get_processed_split_path("train", "isot")
+    print(f"Loading ISOT trusted articles from {path}")
+
+    df = pd.read_csv(path)
+    df = df.dropna(subset=["binary_label", "title", "text"])
+    df = df[df["binary_label"].astype(int) == 1].reset_index(drop=True)
+
+    if max_articles:
+        df = df.head(max_articles).copy()
+
+    documents = []
+    for _, row in df.iterrows():
+        title = str(row.get("title", "")).strip()
+        body = _truncate_words(row.get("text", ""), max_words=300)
+        text = f"Title: {title}\nBody: {body}".strip()
+
+        if len(text) < 80:
+            continue
+
+        documents.append({
+            "text"          : text,
+            "source"        : "reuters",
+            "date"          : _parse_isot_date(row.get("date", "")) or "2017-01-01",
+            "origin_split"  : "train",
+            "origin_dataset": "isot",
+            "is_external"   : False,
+            "kb_profile"    : "dataset_train_reuters"
+        })
+
+    print(f"Loaded {len(documents)} trusted Reuters articles for ISOT")
+    return documents
+
+
+def load_liar_trusted_documents():
+    """Builds the original LIAR-oriented trusted corpus."""
+
+    print("Fetching Wikipedia articles...")
+    print("="*50)
+    wiki_docs = fetch_wikipedia_docs()
+    print(f"\nFetched {len(wiki_docs)} Wikipedia articles")
+
+    all_docs = TRUSTED_DOCUMENTS + wiki_docs
+    print(f"Total documents: {len(all_docs)}")
+    print(f"  Hardcoded : {len(TRUSTED_DOCUMENTS)}")
+    print(f"  Wikipedia : {len(wiki_docs)}")
+    return all_docs
+
+
+def build_documents_for_active_dataset(max_articles=None):
+    """Returns the trusted document list for the active dataset."""
+
+    dataset = config._normalize_dataset_name()
+    if dataset == "isot":
+        return load_isot_trusted_documents(max_articles=max_articles)
+    return load_liar_trusted_documents()
+
+
 # ── Build Index ───────────────────────────────────────────────────────
-def build_knowledge_base(documents):
+def build_knowledge_base(documents, output_dir):
     """
     Encodes documents and saves FAISS index + metadata to disk.
 
     Args:
         documents : list of dicts with text, source, date
+        output_dir: directory to save index + metadata
     """
 
     print(f"\nBuilding knowledge base with {len(documents)} documents...")
@@ -248,30 +346,34 @@ def build_knowledge_base(documents):
     for doc in documents:
         source = doc.get("source", "unknown").lower()
         metadata.append({
-            "text"          : doc["text"],
-            "source"        : source,
-            "date"          : doc.get("date", "unknown"),
-            "source_weight" : config.SOURCE_WEIGHTS.get(
+            "text"           : doc["text"],
+            "source"         : source,
+            "date"           : doc.get("date", "unknown"),
+            "source_weight"  : config.SOURCE_WEIGHTS.get(
                 source, config.SOURCE_WEIGHTS["unknown"]
             ),
-            "recency_weight": compute_recency_weight(
+            "recency_weight" : compute_recency_weight(
                 doc.get("date", "")
-            )
+            ),
+            "origin_split"   : doc.get("origin_split", "external"),
+            "origin_dataset" : doc.get("origin_dataset", "external"),
+            "is_external"    : bool(doc.get("is_external", True)),
+            "kb_profile"     : doc.get("kb_profile", "external_reference"),
         })
 
     # Save to disk
-    os.makedirs(config.KNOWLEDGE_BASE, exist_ok=True)
+    os.makedirs(output_dir, exist_ok=True)
 
     faiss.write_index(
         index,
-        os.path.join(config.KNOWLEDGE_BASE, "faiss_index.bin")
+        os.path.join(output_dir, "faiss_index.bin")
     )
     with open(
-        os.path.join(config.KNOWLEDGE_BASE, "metadata.pkl"), "wb"
+        os.path.join(output_dir, "metadata.pkl"), "wb"
     ) as f:
         pickle.dump(metadata, f)
 
-    print(f"\nKnowledge base saved to {config.KNOWLEDGE_BASE}")
+    print(f"\nKnowledge base saved to {output_dir}")
     print(f"  faiss_index.bin — {index.ntotal} vectors")
     print(f"  metadata.pkl    — {len(metadata)} documents")
 
@@ -279,21 +381,14 @@ def build_knowledge_base(documents):
 
 
 if __name__ == "__main__":
+    dataset = config._normalize_dataset_name()
+    output_dir = os.path.join(config.KNOWLEDGE_BASE, dataset)
+    print(f"Building knowledge base for dataset: {dataset}")
 
-    # Step 1 — Fetch Wikipedia articles
-    print("Fetching Wikipedia articles...")
-    print("="*50)
-    wiki_docs = fetch_wikipedia_docs()
-    print(f"\nFetched {len(wiki_docs)} Wikipedia articles")
+    documents = build_documents_for_active_dataset()
 
-    # Step 2 — Combine with hardcoded trusted documents
-    all_docs = TRUSTED_DOCUMENTS + wiki_docs
-    print(f"Total documents: {len(all_docs)}")
-    print(f"  Hardcoded : {len(TRUSTED_DOCUMENTS)}")
-    print(f"  Wikipedia : {len(wiki_docs)}")
-
-    # Step 3 — Build and save index
-    index, metadata = build_knowledge_base(all_docs)
+    # Build and save index
+    index, metadata = build_knowledge_base(documents, output_dir)
 
     print("\nKnowledge base ready.")
     print(f"Final index size: {index.ntotal} vectors")

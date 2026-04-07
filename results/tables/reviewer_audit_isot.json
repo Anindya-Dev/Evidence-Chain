@@ -1,0 +1,107 @@
+{
+  "generated_at": "2026-04-07T20:59:14.279758",
+  "dataset": "isot",
+  "benchmark_profile": "article_classification",
+  "cheap_mode": true,
+  "strict_review_mode": false,
+  "split_summaries": {
+    "train": {
+      "path": "C:\\Users\\Administrator\\Desktop\\Evidence-Chain\\data\\processed\\isot_train.csv",
+      "available": true,
+      "rows": 35918,
+      "label_counts": {
+        "0": 18846,
+        "1": 17072
+      },
+      "columns": [
+        "title",
+        "text",
+        "subject",
+        "date",
+        "binary_label",
+        "label",
+        "text_truncated",
+        "combined_text"
+      ]
+    },
+    "val": {
+      "path": "C:\\Users\\Administrator\\Desktop\\Evidence-Chain\\data\\processed\\isot_val.csv",
+      "available": true,
+      "rows": 4490,
+      "label_counts": {
+        "0": 2286,
+        "1": 2204
+      },
+      "columns": [
+        "title",
+        "text",
+        "subject",
+        "date",
+        "binary_label",
+        "label",
+        "text_truncated",
+        "combined_text"
+      ]
+    },
+    "test": {
+      "path": "C:\\Users\\Administrator\\Desktop\\Evidence-Chain\\data\\processed\\isot_test.csv",
+      "available": true,
+      "rows": 4490,
+      "label_counts": {
+        "0": 2349,
+        "1": 2141
+      },
+      "columns": [
+        "title",
+        "text",
+        "subject",
+        "date",
+        "binary_label",
+        "label",
+        "text_truncated",
+        "combined_text"
+      ]
+    }
+  },
+  "knowledge_base_summary": {
+    "knowledge_base_dir": "C:\\Users\\Administrator\\Desktop\\Evidence-Chain\\data\\knowledge_base\\isot",
+    "metadata_path": "C:\\Users\\Administrator\\Desktop\\Evidence-Chain\\data\\knowledge_base\\isot\\metadata.pkl",
+    "metadata_available": true,
+    "document_count": 17071,
+    "source_counts": {
+      "reuters": 17071
+    },
+    "kb_profiles": {
+      "dataset_train_reuters": 17071
+    },
+    "external_docs": 0,
+    "train_derived_docs": 17071,
+    "provenance_missing_docs": 0
+  },
+  "artifacts": {
+    "evaluation_json": {
+      "path": "C:\\Users\\Administrator\\Desktop\\Evidence-Chain\\results\\tables\\full_evaluation_isot.json",
+      "available": true
+    },
+    "ablation_csv": {
+      "path": "C:\\Users\\Administrator\\Desktop\\Evidence-Chain\\results\\tables\\ablation_results_isot.csv",
+      "available": true
+    },
+    "comparison_csv": {
+      "path": "C:\\Users\\Administrator\\Desktop\\Evidence-Chain\\results\\tables\\comparison_table_isot.csv",
+      "available": true
+    },
+    "bert_csv": {
+      "path": "C:\\Users\\Administrator\\Desktop\\Evidence-Chain\\results\\tables\\bert_results_isot.csv",
+      "available": true
+    }
+  },
+  "warnings": [
+    "ISOT is an article-classification benchmark whose real/fake labels are highly correlated with publication/source style (Reuters vs non-Reuters content).",
+    "Cheap mode is enabled; sampled evaluations are suitable for development, not headline final-paper claims.",
+    "Cheap mode is currently enabled in the environment. Final reported numbers should be rerun with CHEAP_MODE=false.",
+    "The active knowledge base contains train-derived documents. Treat this as auxiliary retrieval for classification, not as independent external evidence."
+  ],
+  "severe_issues": [],
+  "review_ready": false
+}

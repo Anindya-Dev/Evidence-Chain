@@ -2,7 +2,9 @@ import os
 import json
 import time
 import hashlib
+import re
 from pathlib import Path
+from urllib import request as urllib_request
 
 from dotenv import load_dotenv
 
@@ -12,13 +14,16 @@ load_dotenv()
 
 
 class LLMClient:
-    """Small adapter around Groq, Gemini, and OpenAI-compatible chat APIs."""
+    """Small adapter around Groq, Gemini, Ollama, and OpenAI-style chat APIs."""
 
     def __init__(self):
         self.provider = config.LLM_PROVIDER.lower()
         self.cache_dir = Path(config.CACHE_DIR) / "llm"
         self.cache_dir.mkdir(parents=True, exist_ok=True)
-        self.min_interval_sec = 60.0 / max(config.LLM_RATE_LIMIT_RPM, 1)
+        self.min_interval_sec = (
+            0.0 if self.provider == "ollama"
+            else 60.0 / max(config.LLM_RATE_LIMIT_RPM, 1)
+        )
         self.last_request_ts = 0.0
 
         if self.provider == "groq":
@@ -38,6 +43,10 @@ class LLMClient:
 
             genai.configure(api_key=api_key)
             self.client = genai.GenerativeModel(config.LLM_MODEL)
+
+        elif self.provider == "ollama":
+            base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+            self.base_url = re.sub(r"/v1/?$", "", base_url.rstrip("/"))
 
         elif self.provider in {"openai", "openai_compatible", "nvidia"}:
             from openai import OpenAI
@@ -64,8 +73,9 @@ class LLMClient:
             return cached
 
         raw = self._with_retries(prompt)
-        self._write_cache(cache_key, raw)
-        return raw
+        normalized = self._normalize_json_text(raw)
+        self._write_cache(cache_key, normalized)
+        return normalized
 
     def _with_retries(self, prompt):
         last_error = None
@@ -95,6 +105,29 @@ class LLMClient:
                 max_tokens=config.LLM_MAX_TOKENS,
             )
             return response.choices[0].message.content.strip()
+
+        if self.provider == "ollama":
+            payload = {
+                "model": config.LLM_MODEL,
+                "prompt": prompt,
+                "stream": False,
+                "options": {
+                    "temperature": config.LLM_TEMPERATURE,
+                    "num_predict": config.LLM_MAX_TOKENS,
+                }
+            }
+            body = json.dumps(payload).encode("utf-8")
+            req = urllib_request.Request(
+                f"{self.base_url}/api/generate",
+                data=body,
+                headers={"Content-Type": "application/json"},
+                method="POST"
+            )
+            with urllib_request.urlopen(
+                req, timeout=config.OLLAMA_TIMEOUT_SEC
+            ) as response:
+                data = json.loads(response.read().decode("utf-8"))
+            return str(data.get("response", "")).strip()
 
         if self.provider in {"openai", "openai_compatible", "nvidia"}:
             response = self.client.chat.completions.create(
@@ -149,6 +182,35 @@ class LLMClient:
         path = self.cache_dir / f"{cache_key}.json"
         with path.open("w", encoding="utf-8") as handle:
             json.dump({"response": response_text}, handle, ensure_ascii=False)
+
+    def _normalize_json_text(self, response_text):
+        """
+        Normalizes model output before JSON parsing.
+
+        Local models sometimes wrap valid JSON in Markdown fences like:
+        ```json
+        {...}
+        ```
+        The decomposer and reasoner expect raw JSON text, so strip the
+        fence wrapper while preserving the inner payload.
+        """
+
+        text = (response_text or "").strip()
+
+        fenced = re.search(
+            r"```(?:json)?\s*(.*?)\s*```",
+            text,
+            flags=re.IGNORECASE | re.DOTALL
+        )
+        if fenced:
+            return fenced.group(1).strip()
+
+        if text.lower().startswith("json"):
+            remainder = text[4:].lstrip(" \t\r\n:")
+            if remainder.startswith("{") or remainder.startswith("["):
+                return remainder
+
+        return text
 
     def _is_rate_limit_error(self, exc):
         message = str(exc).lower()

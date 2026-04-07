@@ -16,12 +16,13 @@ import pandas as pd
 import torch
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, f1_score
+from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from transformers import RobertaTokenizer, RobertaForSequenceClassification
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import config
-from modules.preprocessor import preprocess_text
+from modules.preprocessor import build_model_input, extract_claim_text
 from modules.retriever import Retriever
 from modules.decomposer import ClaimDecomposer
 from modules.reasoner import EvidenceReasoner
@@ -145,7 +146,7 @@ class StackingEnsemble:
     def save(self, path=None):
         """Saves trained ensemble to disk."""
         if path is None:
-            path = os.path.join(config.MODELS_DIR, "ensemble.pkl")
+            path = config.get_preferred_ensemble_path()
 
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, "wb") as f:
@@ -159,7 +160,7 @@ class StackingEnsemble:
     def load(self, path=None):
         """Loads trained ensemble from disk."""
         if path is None:
-            path = os.path.join(config.MODELS_DIR, "ensemble.pkl")
+            path = config.get_ensemble_path()
 
         with open(path, "rb") as f:
             data = pickle.load(f)
@@ -171,29 +172,43 @@ class StackingEnsemble:
         print(f"Ensemble loaded from {path}")
 
 
-def _resolve_liar_validation_assets():
-    """
-    Returns the LIAR validation file and checkpoint paths used for
-    ensemble training.
-    """
+def _resolve_validation_assets(dataset=None):
+    """Returns the validation split and checkpoint paths for a dataset."""
 
-    data_path = os.path.join(config.DATA_PROCESSED, "val.csv")
-    model_path = os.path.join(config.MODELS_DIR, "roberta_liar")
+    dataset = config._normalize_dataset_name(dataset)
+    data_path = config.get_processed_split_path("val", dataset)
+    model_path = config.get_roberta_model_dir(dataset)
 
     if not os.path.exists(data_path):
-        raise FileNotFoundError(f"Missing LIAR validation data: {data_path}")
+        raise FileNotFoundError(
+            f"Missing {dataset.upper()} validation data: {data_path}"
+        )
     if not os.path.isdir(model_path):
-        raise FileNotFoundError(f"Missing LIAR RoBERTa checkpoint: {model_path}")
+        raise FileNotFoundError(
+            f"Missing {dataset.upper()} RoBERTa checkpoint: {model_path}"
+        )
 
     return data_path, model_path
 
 
-def _get_bert_probability(text, model, tokenizer, device):
+def _resolve_text_column(df):
+    """Returns the primary claim column for feature-table inspection."""
+
+    if "statement" in df.columns:
+        return "statement"
+    if "title" in df.columns:
+        return "title"
+    if "combined_text" in df.columns:
+        return "combined_text"
+    raise KeyError("Expected 'statement', 'title', or 'combined_text'.")
+
+
+def _get_bert_probability(text, model, tokenizer, device, dataset=None):
     """Returns RoBERTa probability of REAL for one claim."""
 
-    clean = preprocess_text(text)
+    model_input = build_model_input(text, dataset=dataset)
     encoding = tokenizer(
-        clean,
+        model_input,
         max_length=config.BERT_MAX_LENGTH,
         truncation=True,
         padding="max_length",
@@ -210,13 +225,13 @@ def _get_bert_probability(text, model, tokenizer, device):
     return probs[0][1].item()
 
 
-def _run_rag_branch(claim, decomposer, retriever, reasoner):
+def _run_rag_branch(example, decomposer, retriever, reasoner, dataset=None):
     """
     Runs the claim decomposition + retrieval + reasoning branch for one
-    LIAR claim and returns an aggregated RAG result.
+    dataset example and returns an aggregated RAG result.
     """
 
-    clean_claim = preprocess_text(claim)
+    clean_claim = extract_claim_text(example, dataset=dataset)
     sub_claims = decomposer.decompose(clean_claim)
     sub_results = []
 
@@ -246,31 +261,35 @@ def _run_rag_branch(claim, decomposer, retriever, reasoner):
     return rag_result
 
 
-def train_ensemble_on_validation(sample_size=None):
+def train_ensemble_on_validation(sample_size=None, dataset=None):
     """
-    Generates real validation features from the LIAR validation set,
+    Generates real validation features from the active validation set,
     trains the ensemble, and saves both the trained model and feature
     table for inspection.
-
-    Why LIAR only?
-    The current RAG pipeline is built for short, claim-style inputs.
-    Using the same decomposition and reasoning flow on full ISOT
-    articles would produce weak and misleading ensemble features.
     """
 
-    data_path, model_path = _resolve_liar_validation_assets()
+    dataset = config._normalize_dataset_name(dataset)
+    data_path, model_path = _resolve_validation_assets(dataset)
+
+    if sample_size is None and config.CHEAP_MODE:
+        sample_size = config.CHEAP_EVAL_SAMPLE_SIZE
 
     print("=" * 65)
-    print("  TRAINING STACKING ENSEMBLE ON LIAR VALIDATION FEATURES")
+    print(
+        f"  TRAINING STACKING ENSEMBLE ON {dataset.upper()} VALIDATION FEATURES"
+    )
     print("=" * 65)
     print(f"Validation data : {data_path}")
     print(f"RoBERTa path    : {model_path}")
+    if sample_size:
+        print(f"Sample size     : {sample_size}")
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Device          : {device}")
 
     val_df = pd.read_csv(data_path)
-    val_df = val_df.dropna(subset=["binary_label", "statement"]).reset_index(drop=True)
+    text_column = _resolve_text_column(val_df)
+    val_df = val_df.dropna(subset=["binary_label", text_column]).reset_index(drop=True)
 
     if sample_size:
         val_df = val_df.sample(sample_size, random_state=config.RANDOM_SEED)
@@ -291,22 +310,22 @@ def train_ensemble_on_validation(sample_size=None):
     feature_rows = []
 
     for idx, row in val_df.iterrows():
-        claim = str(row["statement"])
+        example = row
         label = int(row["binary_label"])
 
         try:
             rag_result = _run_rag_branch(
-                claim, decomposer, retriever, reasoner
+                example, decomposer, retriever, reasoner, dataset=dataset
             )
             bert_prob = _get_bert_probability(
-                claim, bert_model, tokenizer, device
+                example, bert_model, tokenizer, device, dataset=dataset
             )
             feature_vector = ensemble.build_feature_vector(
                 bert_prob, rag_result
             )[0]
 
             feature_rows.append({
-                "claim"              : claim,
+                "claim"              : extract_claim_text(example, dataset=dataset),
                 "label"              : label,
                 "bert_prob"          : feature_vector[0],
                 "rag_confidence"     : feature_vector[1],
@@ -331,14 +350,48 @@ def train_ensemble_on_validation(sample_size=None):
     X = features_df[ensemble.feature_names].to_numpy(dtype=float)
     y = features_df["label"].to_numpy(dtype=int)
 
+    holdout_metrics = {
+        "holdout_samples": 0,
+        "holdout_accuracy": None,
+        "holdout_f1": None,
+    }
+
+    # Report a small honest holdout estimate before refitting on the full
+    # validation feature table that we save for downstream inference.
+    class_counts = np.bincount(y) if len(y) else np.array([])
+    if len(y) >= 20 and len(class_counts) >= 2 and np.min(class_counts) >= 2:
+        X_train, X_holdout, y_train, y_holdout = train_test_split(
+            X,
+            y,
+            test_size=0.2,
+            stratify=y,
+            random_state=config.RANDOM_SEED
+        )
+
+        holdout_ensemble = StackingEnsemble()
+        holdout_ensemble.train(X_train, y_train)
+        holdout_preds, _ = holdout_ensemble.predict(X_holdout)
+        holdout_metrics = {
+            "holdout_samples": int(len(y_holdout)),
+            "holdout_accuracy": round(accuracy_score(y_holdout, holdout_preds), 4),
+            "holdout_f1": round(
+                f1_score(y_holdout, holdout_preds, average="weighted"), 4
+            ),
+        }
+
+        print("\nHoldout metrics before final refit:")
+        for key, value in holdout_metrics.items():
+            print(f"  {key:<16}: {value}")
+
     ensemble.train(X, y)
     preds, _ = ensemble.predict(X)
 
     metrics = {
-        "dataset"  : "liar",
+        "dataset"  : dataset,
         "samples"  : int(len(features_df)),
         "accuracy" : round(accuracy_score(y, preds), 4),
-        "f1"       : round(f1_score(y, preds, average="weighted"), 4)
+        "f1"       : round(f1_score(y, preds, average="weighted"), 4),
+        **holdout_metrics,
     }
 
     print("\nValidation metrics after ensemble training:")
@@ -346,12 +399,16 @@ def train_ensemble_on_validation(sample_size=None):
         print(f"  {key:<10}: {value}")
 
     os.makedirs(config.TABLES_DIR, exist_ok=True)
-    features_path = os.path.join(config.TABLES_DIR, "ensemble_features_liar.csv")
-    metrics_path = os.path.join(config.TABLES_DIR, "ensemble_results_liar.csv")
+    features_path = os.path.join(
+        config.TABLES_DIR, f"ensemble_features_{dataset}.csv"
+    )
+    metrics_path = os.path.join(
+        config.TABLES_DIR, f"ensemble_results_{dataset}.csv"
+    )
 
     features_df.to_csv(features_path, index=False)
     pd.DataFrame([metrics]).to_csv(metrics_path, index=False)
-    ensemble.save()
+    ensemble.save(config.get_preferred_ensemble_path(dataset))
 
     print(f"\nSaved features to {features_path}")
     print(f"Saved metrics  to {metrics_path}")

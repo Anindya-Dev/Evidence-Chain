@@ -8,6 +8,23 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+
+def _normalize_dataset_name(dataset=None):
+    """Returns the active dataset name in a consistent lowercase form."""
+
+    if dataset is None:
+        dataset = globals().get("DATASET", "")
+    return str(dataset).strip().lower()
+
+
+def _env_flag(name, default=False):
+    """Parses a boolean env var with a safe default."""
+
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
 # ── Paths ──────────────────────────────────────────────────────────────
 BASE_DIR        = os.path.dirname(os.path.abspath(__file__))
 
@@ -28,6 +45,14 @@ RANDOM_SEED = 42
 # False = use full dataset for final paper results
 DEV_MODE        = False
 DEV_SAMPLE_SIZE = 500
+
+# ── Cheap Mode ────────────────────────────────────────────────────────
+# Use this for local development on small hardware.
+# It reduces evaluation cost without changing the core architecture.
+CHEAP_MODE = _env_flag("CHEAP_MODE", False)
+CHEAP_EVAL_SAMPLE_SIZE = int(os.getenv("CHEAP_EVAL_SAMPLE_SIZE", "100"))
+CHEAP_ABLATION_SAMPLE_SIZE = int(os.getenv("CHEAP_ABLATION_SAMPLE_SIZE", "50"))
+CHEAP_MAX_SUBCLAIMS = int(os.getenv("CHEAP_MAX_SUBCLAIMS", "2"))
 
 # ── Dataset Settings ───────────────────────────────────────────────────
 TRAIN_RATIO = 0.80
@@ -99,13 +124,18 @@ HALLUCINATION_CONF_THRESHOLD = 0.75
 
 # ── LLM Settings ──────────────────────────────────────────────────────
 # Temperature 0.0 = deterministic = reproducible research results
-LLM_PROVIDER    = os.getenv("LLM_PROVIDER", "groq")
+LLM_PROVIDER    = os.getenv("LLM_PROVIDER", "ollama")
 LLM_MODEL       = os.getenv(
     "LLM_MODEL",
-    "gemini-2.5-flash" if LLM_PROVIDER.lower() == "gemini" else "llama-3.3-70b-versatile"
+    (
+        "gemini-2.5-flash" if LLM_PROVIDER.lower() == "gemini"
+        else "qwen2.5:7b" if LLM_PROVIDER.lower() == "ollama"
+        else "llama-3.3-70b-versatile"
+    )
 )
 LLM_TEMPERATURE = 0.0
 LLM_MAX_TOKENS  = 1000
+OLLAMA_TIMEOUT_SEC = float(os.getenv("OLLAMA_TIMEOUT_SEC", "300"))
 LLM_RATE_LIMIT_RPM = int(os.getenv("LLM_RATE_LIMIT_RPM", "30"))
 LLM_MAX_RETRIES    = int(os.getenv("LLM_MAX_RETRIES", "6"))
 LLM_RETRY_BASE_SEC = float(os.getenv("LLM_RETRY_BASE_SEC", "2.0"))
@@ -113,4 +143,139 @@ LLM_RETRY_BASE_SEC = float(os.getenv("LLM_RETRY_BASE_SEC", "2.0"))
 # ── Dataset Selection ──────────────────────────────────────────────────
 # Switch between LIAR and ISOT training
 # Used for cross-dataset evaluation in paper
-DATASET = "isot"   # options: "liar" or "isot"
+DATASET = _normalize_dataset_name(os.getenv("DATASET", "isot"))
+
+# ── Benchmark Profile ──────────────────────────────────────────────────
+# Keep the benchmark intent explicit:
+# - verification          : external-evidence claim verification
+# - article_classification: news/article classification benchmark
+BENCHMARK_PROFILE = os.getenv(
+    "BENCHMARK_PROFILE",
+    "verification" if DATASET == "liar" else "article_classification"
+).strip().lower()
+
+# ── Review / Reporting Safety ──────────────────────────────────────────
+# These flags do not change the model architecture; they control how
+# strict the reporting layer is about caveats, saved outputs, and full
+# versus development-style runs.
+STRICT_REVIEW_MODE = _env_flag("STRICT_REVIEW_MODE", False)
+SAVE_ALL_EVAL_RESULTS = _env_flag("SAVE_ALL_EVAL_RESULTS", False)
+REVIEW_AUDIT_PATH = os.path.join(TABLES_DIR, f"reviewer_audit_{DATASET}.json")
+
+
+def get_benchmark_profile(dataset=None):
+    """Returns the benchmark profile for a dataset/configuration."""
+
+    dataset = _normalize_dataset_name(dataset) or DATASET
+    default_profile = (
+        "verification" if dataset == "liar" else "article_classification"
+    )
+    return os.getenv("BENCHMARK_PROFILE", default_profile).strip().lower()
+
+
+def get_benchmark_notes(dataset=None, benchmark_profile=None):
+    """
+    Returns benchmark caveats used by evaluation/reporting scripts.
+
+    The goal is not to block experimentation, but to keep the saved
+    artifacts honest about what a benchmark does and does not prove.
+    """
+
+    dataset = _normalize_dataset_name(dataset) or DATASET
+    benchmark_profile = (
+        benchmark_profile or get_benchmark_profile(dataset)
+    ).strip().lower()
+
+    notes = []
+    severe_issues = []
+
+    if dataset == "isot":
+        notes.append(
+            "ISOT is an article-classification benchmark whose real/fake "
+            "labels are highly correlated with publication/source style "
+            "(Reuters vs non-Reuters content)."
+        )
+        if benchmark_profile == "verification":
+            severe_issues.append(
+                "ISOT should not be treated as the primary external-evidence "
+                "fact-verification benchmark."
+            )
+
+    if dataset == "liar":
+        notes.append(
+            "LIAR contains short human claims and is better aligned with "
+            "claim-level verification than ISOT."
+        )
+
+    if CHEAP_MODE:
+        notes.append(
+            "Cheap mode is enabled; sampled evaluations are suitable for "
+            "development, not headline final-paper claims."
+        )
+
+    return {
+        "dataset": dataset,
+        "benchmark_profile": benchmark_profile,
+        "notes": notes,
+        "severe_issues": severe_issues,
+    }
+
+
+def get_processed_split_path(split, dataset=None):
+    """Returns the processed CSV path for a dataset split."""
+
+    dataset = _normalize_dataset_name(dataset)
+    filename = f"{split}.csv" if dataset == "liar" else f"{dataset}_{split}.csv"
+    return os.path.join(DATA_PROCESSED, filename)
+
+
+def get_roberta_model_dir(dataset=None):
+    """Returns the preferred RoBERTa checkpoint directory for a dataset."""
+
+    dataset = _normalize_dataset_name(dataset)
+    preferred = os.path.join(MODELS_DIR, f"roberta_{dataset}")
+    if os.path.isdir(preferred):
+        return preferred
+    return os.path.join(MODELS_DIR, "roberta_liar")
+
+
+def get_ensemble_path(dataset=None):
+    """
+    Returns the ensemble path for a dataset.
+
+    Dataset-specific ensembles are preferred. The legacy shared ensemble is
+    still accepted as a fallback so existing experiments keep working.
+    """
+
+    dataset = _normalize_dataset_name(dataset)
+    preferred = os.path.join(MODELS_DIR, f"ensemble_{dataset}.pkl")
+    if os.path.exists(preferred):
+        return preferred
+
+    legacy = os.path.join(MODELS_DIR, "ensemble.pkl")
+    if os.path.exists(legacy):
+        return legacy
+
+    return preferred
+
+
+def get_preferred_ensemble_path(dataset=None):
+    """Returns the dataset-specific ensemble path without legacy fallback."""
+
+    dataset = _normalize_dataset_name(dataset)
+    return os.path.join(MODELS_DIR, f"ensemble_{dataset}.pkl")
+
+
+def get_knowledge_base_dir(dataset=None):
+    """
+    Returns the knowledge-base directory for a dataset.
+
+    Dataset-specific stores live under ``data/knowledge_base/<dataset>``.
+    The old shared directory remains a fallback for backwards compatibility.
+    """
+
+    dataset = _normalize_dataset_name(dataset)
+    preferred = os.path.join(KNOWLEDGE_BASE, dataset)
+    if os.path.isdir(preferred):
+        return preferred
+    return KNOWLEDGE_BASE
