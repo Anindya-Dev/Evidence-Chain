@@ -1,0 +1,2 @@
+dataset,samples,accuracy,f1,holdout_samples,holdout_accuracy,holdout_f1
+liar,50,0.6,0.6,10,0.5,0.3333

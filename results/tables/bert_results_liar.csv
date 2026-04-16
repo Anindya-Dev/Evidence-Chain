@@ -1,0 +1,2 @@
+dataset,benchmark_profile,model,accuracy,f1_score,epochs,best_epoch,train_examples,val_examples,test_examples
+liar,verification,roberta-base,0.6415,0.636,3,3,10269,1284,1283

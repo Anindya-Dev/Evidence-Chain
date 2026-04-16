@@ -1,0 +1,51 @@
+claim,label,bert_prob,rag_confidence,max_similarity,source_weight_avg,hallucination_flag,sub_claim_count,rag_verdict,rag_raw_confidence
+On the Cuba embargo,0,0.31802916526794434,0.0,0.1624,0.82,0.0,1.0,UNVERIFIABLE,0.0
+My campaign alone has created more jobs in the state of Rhode Island than Narragansett Beer.,1,0.7984364628791809,0.0,0.2244,0.74,0.0,2.0,UNVERIFIABLE,0.0
+"""Since 1981, reconciliation has been used 21 times. Most of it's been used by Republicans.""",1,0.8570065498352051,0.0,0.2281,0.76,0.0,2.0,UNVERIFIABLE,0.0
+The state GOP ticket says their top priority is a career-long mission to outlaw abortion in all cases and ban some common forms of birth control.,0,0.47653254866600037,0.0,0.4232,0.82,0.0,2.0,UNVERIFIABLE,0.0
+"The Dodd-Frank financial-reform laws hundreds of new rules will force small banks and credit unions to burn up an estimated 2,260,631 labor hours just for compliance.",0,0.5754753947257996,0.0,0.3886,0.82,0.0,2.0,UNVERIFIABLE,0.0
+We have the lowest beer tax in the nation.,0,0.8585792779922485,0.5,0.399,0.82,0.0,1.0,UNVERIFIABLE,0.5
+"""The reality is, with a $2 trillion-a-year health care budget, we're spending more on health care, nearly 17 percent of our gross domestic product, versus 3.8 percent of GDP on the entire military budget.""",0,0.8787602186203003,0.15000000000000002,0.6529,0.7667,0.0,3.0,FALSE,0.85
+"For the first time in over a decade, business leaders around the world have declared that China is no longer the worlds No. 1 place to invest; America is.",1,0.8370073437690735,0.25,0.3335,0.78,0.0,2.0,UNVERIFIABLE,0.25
+"Sarah Palin endorsed a Wasilla policy that charged sexual assault victims for their ""rape kits.""",1,0.39107856154441833,0.25,0.3564,0.8,0.0,2.0,UNVERIFIABLE,0.25
+"Energy nominee Steven Chu has called coal ""his worst nightmare.""",1,0.5987091064453125,0.15000000000000002,0.2581,0.74,1.0,2.0,FALSE,0.85
+"When I was born, less than 10 percent of the federal budget was entitlement spending. Its now 60 percent of the budget.",1,0.8566926121711731,0.19999999999999996,0.5519,0.74,0.0,2.0,FALSE,0.8
+The recent process of awarding $3 billion worth of airport vending contracts was the most open and transparent procurement process in the citys history.,1,0.8082193732261658,0.0,0.235,0.76,0.0,2.0,UNVERIFIABLE,0.0
+"Says that when Democrats controlled Congress and the White House, federal spending as a share of the Gross Domestic Product leapt from 18.2 percent in 2001 to 25.2 percent in 2009 -- the largest such increase in any eight-year period since World War II.",0,0.866554319858551,0.15000000000000002,0.4731,0.8067,0.0,3.0,FALSE,0.85
+Tim Kaine urged$500 billion in Medicare cuts.,0,0.28514572978019714,0.5,0.3767,0.82,0.0,1.0,UNVERIFIABLE,0.5
+Barack Obama is only the second Democrat in the last 75 years to win Ohio twice with more than 50 percent of the vote.,1,0.8699053525924683,0.15000000000000002,0.4851,0.76,0.0,2.0,FALSE,0.85
+"For the cost of $5 vanilla soy latte a day, you can get a sweet health insurance plan to match.",1,0.7752054929733276,0.5,0.2606,0.78,0.0,2.0,UNVERIFIABLE,0.5
+"Says nearly 30,000 federal employees in Oregon were furloughed during the government shutdown.",0,0.6545403003692627,0.25,0.2999,0.82,0.0,2.0,UNVERIFIABLE,0.25
+A provision of the Senate immigration bill would require you to have government permission to get a second job.,1,0.42841774225234985,0.3333,0.3197,0.7667,0.0,3.0,UNVERIFIABLE,0.3333
+ISIS is going to people showing videos of Donald Trump insulting Islam and Muslims in order to recruit more radical jihadists.,0,0.31850960850715637,0.25,0.2098,0.765,0.0,2.0,UNVERIFIABLE,0.25
+America produces more oil and gas than any other nation in the world.,1,0.8387609720230103,0.65,0.5746,0.74,0.0,2.0,UNVERIFIABLE,0.65
+"Under the clear letter of the law, (Justice Clarence Thomas) must recuse himself from the case challenging the constitutionality of the health care law.",1,0.41547468304634094,0.5,0.3411,0.8,0.0,2.0,UNVERIFIABLE,0.5
+"Rick Perry was the (campaign) chairman for Al Gore at one time, not too many years ago.",1,0.4345273971557617,0.25,0.2795,0.78,0.0,2.0,UNVERIFIABLE,0.25
+Corrupt political bosses. Money laundering. Fraud. Its just another day at the office for Vin Gopal.,0,0.3771198093891144,0.15000000000000002,0.2654,0.77,0.0,4.0,FALSE,0.85
+Veterans can now download their electronic medical records with a click of the mouse.,0,0.4208260476589203,0.0,0.176,0.7667,0.0,3.0,UNVERIFIABLE,0.0
+Large majorities of the public oppose major changes to Medicare and favor higher taxes on the wealthy.,1,0.7280552387237549,0.5,0.4234,0.78,0.0,2.0,UNVERIFIABLE,0.5
+"The photonics bill that was sponsored in Congress and written, was written by Congressman Tom Reed, not Congresswoman Louise Slaughter.",0,0.2996772825717926,0.3333,0.2524,0.7667,0.0,3.0,UNVERIFIABLE,0.3333
+Says that the state spends more money on tax giveaways than it receives in tax collection.,1,0.8054084777832031,0.25,0.3098,0.8,0.0,2.0,UNVERIFIABLE,0.25
+"Never mind that no red light camera, no speed camera, nor any radar gun has ever stopped one accident from occurring.",0,0.6392872333526611,0.5,0.2011,0.8633,0.0,3.0,UNVERIFIABLE,0.5
+"Literally, by the time a child is 18 years of age, theyve killed over 100,000 people in video games and other online things.",1,0.6839696764945984,0.09999999999999998,0.4742,0.84,0.0,1.0,FALSE,0.9
+Rick Scott vetoed funding for 30 Florida rape crisis centers. Scott said the centers werent needed.,0,0.5534684062004089,0.0,0.2316,0.84,0.0,2.0,UNVERIFIABLE,0.0
+"Democrats already agreed to a deal that Republicans wanted, that Eric Cantor said would be a win.",1,0.4471738934516907,0.3333,0.259,0.8333,0.0,3.0,UNVERIFIABLE,0.3333
+"In the Georgia-Russia conflict, we flew a brigade of Georgian soldiers from Iran to Georgia and sent U.S. ships into the Black Sea and provided various kinds of supplies.",1,0.5081252455711365,0.0,0.2424,0.7533,0.0,3.0,UNVERIFIABLE,0.0
+Says the hospital listed on Barack Obamas just-publicized long-form birth certificate denies the president was born there.,0,0.37372371554374695,0.5,0.3835,0.8,0.0,2.0,UNVERIFIABLE,0.5
+We were the last flag flying in Benghazi.,0,0.2162366658449173,0.0,0.1926,0.82,0.0,1.0,UNVERIFIABLE,0.0
+A Republican housing finance reform bill would eliminate a persons ability to obtain 15- and 30-year mortgages.,1,0.5230709910392761,0.25,0.372,0.82,0.0,2.0,UNVERIFIABLE,0.25
+"When Social Security first started, there was 16 workers for every retiree. Today there are three workers for every retiree and soon there will be only two for every retiree.",1,0.8550713062286377,0.1667,0.3275,0.78,0.0,3.0,UNVERIFIABLE,0.1667
+"From 2003 to 2006, Sesame Street made more than $211 million from toy and consumer product sales.",1,0.8328676223754883,0.0,0.2765,0.76,0.0,2.0,UNVERIFIABLE,0.0
+Our numbers are going up at the airport.,0,0.6037569046020508,0.0,0.1813,0.7,0.0,1.0,UNVERIFIABLE,0.0
+"Out of 67 counties (in Florida), I won 66, which is unprecedented. Its never happened before.",0,0.6476522088050842,0.15000000000000002,0.2746,0.78,1.0,3.0,FALSE,0.85
+"""He voted twice for a budget resolution that increases the taxes on individuals making $42,000 a year.""",1,0.6077796816825867,0.09999999999999998,0.4455,0.7933,1.0,3.0,FALSE,0.9
+75 percent of the Obamacare tax falls on the middle class.,0,0.3968879282474518,0.0,0.5192,0.82,0.0,1.0,UNVERIFIABLE,0.0
+Says Al Franken voted to exempt himself and Congress from enrolling in (the Affordable Care Act marketplaces).,0,0.3593272864818573,0.0,0.5609,0.78,0.0,1.0,UNVERIFIABLE,0.0
+"Under President Barack Obamas watch, oil production on federal lands has decreased 14 percent over the past year.",1,0.6646419167518616,0.0,0.4526,0.8,0.0,2.0,UNVERIFIABLE,0.0
+"Bank of America could create 878,300 jobs with benefits if they spent their 2010 bonuses on job creation.",0,0.634405791759491,0.25,0.3734,0.76,0.0,2.0,UNVERIFIABLE,0.25
+"Every dollar we invested in high-quality, early education programs can save more than $7 later on by boosting graduation rates, reducing teen pregnancy, even reducing crime.",1,0.8575560450553894,0.0,0.374,0.7825,0.0,4.0,UNVERIFIABLE,0.0
+There is no statistical evidence that bail bonds increase the likelihood of those awaiting trial returning to court for their scheduled hearings.,0,0.6192790865898132,0.09999999999999998,0.2379,0.7825,1.0,4.0,FALSE,0.9
+Republicans have already cut our neighborhood public schools three budgets in a row.,0,0.8408694863319397,0.0,0.2643,0.78,0.0,2.0,UNVERIFIABLE,0.0
+"Despite the U.S. spending $10 billion on Iraqs electrical system, Baghdad still only gets five hours of electricity a day.",0,0.7580522894859314,0.25,0.3011,0.76,0.0,2.0,UNVERIFIABLE,0.25
+Almost all of the polls that have come out suggest that I am a much stronger candidate against the Republicans than is Hillary Clinton.,0,0.803966224193573,0.25,0.3215,0.76,0.0,2.0,UNVERIFIABLE,0.25
+New Jersey taxpayers will now face the highest tolls in the country.,0,0.8366846442222595,0.0,0.3105,0.76,0.0,2.0,UNVERIFIABLE,0.0

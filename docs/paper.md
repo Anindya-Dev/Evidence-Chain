@@ -127,7 +127,7 @@ EvidenceChain is a modular pipeline with the following stages:
 6. RoBERTa classification of the original claim text.
 7. Stacking ensemble combination of neural and retrieval signals.
 
-The main implementation entry point is `pipeline.py`, which loads the
+The main implementation entry point is `src/pipeline.py`, which loads the
 decomposer, retriever, reasoner, and ensemble once and then evaluates
 claims one at a time.
 
